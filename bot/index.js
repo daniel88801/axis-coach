@@ -1,4 +1,12 @@
+import { readFileSync } from "node:fs";
 import TelegramBot from "node-telegram-bot-api";
+
+try {
+  for (const line of readFileSync(new URL("./.env", import.meta.url), "utf8").split("\n")) {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m && !process.env[m[1].trim()]) process.env[m[1].trim()] = m[2].trim();
+  }
+} catch { /* .env optional when vars are already set */ }
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const webAppUrl = process.env.WEBAPP_URL || "https://daniel88801.github.io/axis-coach/";
