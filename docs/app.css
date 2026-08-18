@@ -1,0 +1,90 @@
+:root {
+  --ink: #070908;
+  --navy: #040617;
+  --fog: #e8ede4;
+  --dim: #9aa398;
+  --mute: #5e675f;
+  --lime: #c6f135;
+  --cyan: #5eebff;
+  --cyan-hot: #00d4ff;
+  --card: #161b18;
+  --line: #243028;
+  --mint: #5ee0b5;
+  --amber: #ffc14a;
+  --coral: #ff5c3a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  background: var(--navy);
+  color: var(--fog);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+}
+#app { height: 100%; position: relative; }
+.view {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  padding: calc(12px + var(--tg-safe-top, 0px)) 18px calc(18px + var(--tg-safe-bottom, 0px));
+}
+.view.on { display: flex; }
+.splash {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: radial-gradient(circle at 50% 42%, #101a4a, #040617 62%, #02030c);
+}
+.orbits { width: 210px; height: 210px; position: relative; display: grid; place-items: center; }
+.ring {
+  position: absolute; inset: 8px; border: 1px solid #5eebff88; border-radius: 50%;
+  animation: spin 9s linear infinite;
+}
+.ring.b { inset: -10px; border-color: #5eebff33; animation-duration: 13s; animation-direction: reverse; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.brand { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; }
+.brand.lg { width: 92px; height: 92px; border-radius: 24px; }
+.word { letter-spacing: 10px; font-size: 34px; margin-top: 18px; }
+.sub { color: var(--cyan); letter-spacing: 2px; font-size: 11px; margin-top: 6px; }
+.bar { width: 148px; height: 3px; border-radius: 99px; background: #5eebff22; margin-top: 28px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 30%; background: linear-gradient(90deg, #00d4ff, #5eebff, #fff); animation: load 1.6s ease-in-out infinite alternate; }
+@keyframes load { to { width: 92%; } }
+.row { display: flex; align-items: center; }
+.space { justify-content: space-between; }
+.hero { font-size: 56px; line-height: .9; letter-spacing: -2px; margin-top: 22px; }
+.coach { color: var(--lime); letter-spacing: 2px; font-size: 13px; font-weight: 700; }
+.muted { color: var(--dim); line-height: 1.45; }
+.tiny { color: var(--mute); letter-spacing: 1.4px; font-size: 11px; }
+.pill { border: 1px solid #5eebff66; color: var(--cyan); border-radius: 99px; padding: 4px 10px; font-size: 10px; letter-spacing: 1px; }
+.cards { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.card {
+  background: var(--card); border-radius: 20px; padding: 14px;
+  display: flex; align-items: center; gap: 12px;
+}
+.card.tap { cursor: pointer; }
+.go { width: 36px; height: 36px; border-radius: 50%; background: var(--lime); color: #111; display: grid; place-items: center; font-weight: 800; }
+.idx { font-size: 11px; letter-spacing: 1px; }
+.btn {
+  margin-top: auto; height: 52px; border: 0; border-radius: 26px;
+  background: var(--lime); color: #111; font-weight: 700; font-size: 15px; width: 100%;
+}
+.btn.ghost { background: var(--fog); margin-top: 10px; }
+.link { color: var(--lime); margin-top: 14px; }
+.stage { position: relative; flex: 1; min-height: 180px; border-radius: 20px; overflow: hidden; background: #111; margin: 12px 0; }
+.stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cue {
+  position: absolute; left: 10px; right: 10px; top: 10px; z-index: 2;
+  background: #070908aa; border-radius: 14px; padding: 10px 12px; font-size: 15px;
+}
+.hud { background: #070908cc; border: 1px solid #c6f13540; border-radius: 24px; padding: 14px; }
+.big { font-size: 52px; line-height: 1; }
+.track { height: 6px; background: #ffffff14; border-radius: 99px; margin: 10px 0 12px; }
+.track i { display: block; height: 100%; background: var(--lime); border-radius: 99px; width: 80%; }
+.score {
+  width: 170px; height: 170px; border-radius: 50%; margin: 16px auto;
+  display: grid; place-items: center;
+}
+.score b { width: 132px; height: 132px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; font-size: 40px; }
+.hist { overflow: auto; display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.icon-btn { width: 36px; height: 36px; border-radius: 50%; background: #07090888; border: 0; color: var(--fog); font-size: 16px; }

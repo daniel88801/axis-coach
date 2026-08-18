@@ -39,6 +39,21 @@ If `pose_landmarker_lite.task` is missing from `app/src/main/assets/`, download 
 
 https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task
 
+## Telegram Mini App
+
+Bot: [@AXIStg01_bot](https://t.me/AXIStg01_bot)
+
+The same coach runs as a Telegram Mini App (camera + MediaPipe Pose in the browser).
+
+```
+cd bot
+cp .env.example .env   # put TELEGRAM_BOT_TOKEN
+npm install
+npm start
+```
+
+Then open the bot and tap **Open AXIS**.
+
 ## Why this is a portfolio app
 
 Recruiters get three things in one APK: modern Compose, a real CameraX/ML pipeline, and domain logic you can read without Android (the analyzers are plain Kotlin + tests). The UI is a custom dark athletic system, not a default purple scaffold.
