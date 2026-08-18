@@ -21,28 +21,81 @@ const bot = new TelegramBot(token, { polling: true });
 const keyboard = {
   keyboard: [[{ text: "Открыть AXIS", web_app: { url: webAppUrl } }]],
   resize_keyboard: true,
+  is_persistent: true,
 };
 
 const inline = {
   inline_keyboard: [[{ text: "Открыть AXIS", web_app: { url: webAppUrl } }]],
 };
 
-bot.onText(/\/start/, async (msg) => {
-  const name = msg.from?.first_name || "атлет";
-  await bot.sendMessage(
-    msg.chat.id,
-    `AXIS готов, ${name}.\n\nЖивой тренер техники внутри Telegram: присед, отжимания, планка. Камера остаётся на телефоне.\n\nНажми «Открыть AXIS» ниже.`,
-    { reply_markup: keyboard },
-  );
-  await bot.sendMessage(msg.chat.id, "Или открой как мини-приложение:", { reply_markup: inline });
+function welcomeText(name) {
+  return [
+    `Привет, ${name}!`,
+    "",
+    "Я AXIS — твой тренер техники в Telegram.",
+    "Смотрю присед, отжимания и планку через камеру. Считаю повторы, ловлю ошибки и подсказываю голосом.",
+    "",
+    "Камера остаётся на телефоне. В облако ничего не уходит.",
+    "",
+    "Нажми «Открыть AXIS», чтобы начать сет.",
+  ].join("\n");
+}
+
+async function greet(chatId, name) {
+  await bot.sendMessage(chatId, welcomeText(name), { reply_markup: keyboard });
+  await bot.sendMessage(chatId, "Можно открыть мини-приложение прямо отсюда:", {
+    reply_markup: inline,
+  });
+}
+
+bot.onText(/\/start\b/, async (msg) => {
+  await greet(msg.chat.id, msg.from?.first_name || "друг");
 });
 
-bot.onText(/\/app/, async (msg) => {
-  await bot.sendMessage(msg.chat.id, "Открыть AXIS", { reply_markup: inline });
+bot.onText(/\/app\b|\/open\b/, async (msg) => {
+  await bot.sendMessage(msg.chat.id, "Открываю AXIS. Удачной тренировки!", {
+    reply_markup: inline,
+  });
+});
+
+bot.onText(/\/help\b|\/помощь\b/, async (msg) => {
+  await bot.sendMessage(
+    msg.chat.id,
+    [
+      "Как пользоваться AXIS:",
+      "",
+      "1. Нажми «Открыть AXIS»",
+      "2. Выбери упражнение: присед, отжимания или планка",
+      "3. Поставь телефон в 2–3 метрах, встань боком, всё тело в кадре",
+      "4. Сделай сет — я посчитаю повторы и подскажу по технике",
+      "",
+      "Команды:",
+      "/start — приветствие",
+      "/app — открыть мини-приложение",
+      "/help — эта подсказка",
+    ].join("\n"),
+    { reply_markup: keyboard },
+  );
+});
+
+bot.on("message", async (msg) => {
+  if (!msg.text || msg.text.startsWith("/")) return;
+  if (msg.web_app_data) return;
+  const text = msg.text.toLowerCase();
+  const name = msg.from?.first_name || "друг";
+  if (/(привет|здравств|добр|хай|hello|hi)/i.test(text)) {
+    await greet(msg.chat.id, name);
+    return;
+  }
+  await bot.sendMessage(
+    msg.chat.id,
+    `${name}, я рядом. Нажми «Открыть AXIS», и начнём тренировку.`,
+    { reply_markup: inline },
+  );
 });
 
 bot.on("polling_error", (err) => {
   console.error("polling", err.message);
 });
 
-console.log("AXIS bot polling. Mini App:", webAppUrl);
+console.log("AXIS бот слушает. Mini App:", webAppUrl);
