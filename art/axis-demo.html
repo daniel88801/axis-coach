@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AXIS — как работает приложение</title>
+  <style>
+    :root {
+      --ink: #070908;
+      --navy: #040617;
+      --fog: #e8ede4;
+      --dim: #9aa398;
+      --mute: #5e675f;
+      --lime: #c6f135;
+      --cyan: #5eebff;
+      --card: #161b18;
+      --line: #243028;
+      --mint: #5ee0b5;
+      --amber: #ffc14a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: #0a0c10;
+      color: var(--fog);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      display: flex;
+      gap: 48px;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+    }
+    .story { max-width: 420px; }
+    .story h1 { font-size: 42px; letter-spacing: -1px; }
+    .story .tag { color: var(--cyan); letter-spacing: 2px; font-size: 12px; margin: 8px 0 16px; }
+    .story p { color: var(--dim); line-height: 1.55; margin-bottom: 18px; }
+    .steps { display: flex; flex-direction: column; gap: 8px; }
+    .step {
+      background: #12151a;
+      border: 1px solid #1e2420;
+      border-radius: 14px;
+      padding: 10px 14px;
+      cursor: pointer;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .step.active { border-color: #2a6; box-shadow: 0 0 0 1px #5eebff55; }
+    .n { width: 26px; height: 26px; border-radius: 50%; background: #1a1f1c; display: grid; place-items: center; font-size: 12px; color: var(--cyan); }
+    .step.active .n { background: var(--cyan); color: #041; }
+    .step b { display: block; font-size: 14px; }
+    .step span { color: var(--dim); font-size: 12px; }
+    .phone {
+      width: 360px;
+      height: 740px;
+      border-radius: 36px;
+      background: #000;
+      padding: 10px;
+      box-shadow: 0 30px 80px #000a, 0 0 0 1px #2a3340;
+      position: relative;
+    }
+    .screen {
+      width: 100%; height: 100%;
+      border-radius: 28px;
+      overflow: hidden;
+      background: var(--ink);
+      position: relative;
+    }
+    .view { position: absolute; inset: 0; padding: 22px 18px 18px; display: none; flex-direction: column; }
+    .view.on { display: flex; }
+    .brand { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; }
+    .brand.lg { width: 88px; height: 88px; border-radius: 22px; }
+    .status { height: 18px; font-size: 11px; opacity: .5; display: flex; justify-content: space-between; }
+    h2.hero { font-size: 56px; line-height: .9; letter-spacing: -2px; }
+    .coach { color: var(--lime); letter-spacing: 2px; font-size: 13px; font-weight: 700; }
+    .pill { border: 1px solid #5eebff66; color: var(--cyan); border-radius: 99px; padding: 4px 10px; font-size: 10px; letter-spacing: 1px; }
+    .card {
+      background: var(--card); border-radius: 20px; padding: 14px;
+      display: flex; align-items: center; gap: 12px; cursor: pointer;
+    }
+    .card:hover { outline: 1px solid #5eebff44; }
+    .idx { color: var(--lime); font-size: 11px; letter-spacing: 1px; }
+    .go { width: 36px; height: 36px; border-radius: 50%; background: var(--lime); color: #111; display: grid; place-items: center; font-weight: 800; }
+    .btn {
+      margin-top: auto; height: 52px; border: 0; border-radius: 26px;
+      background: var(--lime); color: #111; font-weight: 700; font-size: 15px; cursor: pointer;
+    }
+    .btn.cyan { background: var(--cyan); }
+    .muted { color: var(--dim); line-height: 1.45; }
+    .tiny { color: var(--mute); letter-spacing: 1.4px; font-size: 11px; }
+    .row { display: flex; align-items: center; }
+    .splash {
+      background: radial-gradient(circle at 50% 42%, #101a4a, #040617 62%, #02030c);
+      align-items: center; justify-content: center; text-align: center;
+    }
+    .orbits { width: 220px; height: 220px; position: relative; display: grid; place-items: center; }
+    .ring { position: absolute; inset: 10px; border: 1px solid #5eebff88; border-radius: 50%; animation: spin 9s linear infinite; }
+    .ring.b { inset: -8px; border-color: #5eebff33; animation-duration: 13s; animation-direction: reverse; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .splash h2 { letter-spacing: 10px; margin-top: 18px; }
+    .bar { width: 148px; height: 3px; border-radius: 99px; background: #5eebff22; margin-top: 28px; overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 62%; background: linear-gradient(90deg, #00d4ff, #5eebff, #fff); }
+    .hud { margin-top: auto; background: #070908b8; border: 1px solid #c6f13540; border-radius: 24px; padding: 16px; }
+    .big { font-size: 56px; line-height: 1; }
+    .cam {
+      background: linear-gradient(#0b1020, #1a2430);
+      padding: 16px;
+    }
+    .hint { color: var(--dim); font-size: 13px; margin-top: 10px; }
+    .score { width: 180px; height: 180px; border-radius: 50%;
+      background: conic-gradient(var(--lime) 0 312deg, #243028 312deg);
+      display: grid; place-items: center; margin: 16px auto; }
+    .score b { width: 140px; height: 140px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; font-size: 42px; }
+  </style>
+</head>
+<body>
+  <div class="story">
+    <div class="tag">AXIS · LIVE COACH</div>
+    <h1>Как работает приложение</h1>
+    <p>Это живой разбор экранов настоящего AXIS. Кликай шаги слева или кнопки в телефоне.</p>
+    <div class="steps" id="steps"></div>
+  </div>
+
+  <div class="phone">
+    <div class="screen">
+      <section class="view splash on" id="splash">
+        <div class="orbits">
+          <div class="ring"></div>
+          <div class="ring b"></div>
+          <img class="brand lg" src="app_icon.png" alt="AXIS" />
+        </div>
+        <h2>AXIS</h2>
+        <div class="coach" style="color:var(--cyan);margin-top:6px">FORM IN REAL TIME</div>
+        <div class="bar"><i></i></div>
+      </section>
+
+      <section class="view" id="on1">
+        <img class="brand lg" src="app_icon.png" alt="" />
+        <h2 style="font-size:40px;margin:28px 0 12px">AXIS</h2>
+        <p class="muted">A live coach that reads your skeleton, counts the work, and talks when the line breaks.</p>
+        <button class="btn" onclick="go('on2')">Begin</button>
+      </section>
+
+      <section class="view" id="on2">
+        <img class="brand lg" src="app_icon.png" alt="" />
+        <h2 style="font-size:34px;margin:28px 0 12px">Place the phone</h2>
+        <p class="muted">Lean it 2–3 meters away. Side-on for squat and push-up. Whole body in the frame.</p>
+        <button class="btn" onclick="go('on3')">Got it</button>
+      </section>
+
+      <section class="view" id="on3">
+        <img class="brand lg" src="app_icon.png" alt="" />
+        <h2 style="font-size:34px;margin:28px 0 12px">Camera + voice</h2>
+        <p class="muted">AXIS watches on-device. Nothing leaves the phone. Allow camera to start.</p>
+        <button class="btn cyan" onclick="go('home')">Allow camera</button>
+      </section>
+
+      <section class="view" id="home">
+        <div class="row" style="justify-content:space-between">
+          <img class="brand" src="app_icon.png" alt="" />
+          <div class="pill">FIRST SESSION</div>
+        </div>
+        <h2 class="hero" style="margin-top:22px">AXIS</h2>
+        <div class="coach">COACH</div>
+        <p class="muted" style="margin:10px 0 22px">On-device pose. Live cues. No cloud.</p>
+        <div class="tiny">CHOOSE A LIFT</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+          <div class="card" onclick="go('session')">
+            <div style="flex:1"><div class="idx">01</div><b>Squat</b><div class="muted">Depth, knees, torso</div></div>
+            <div class="go">→</div>
+          </div>
+          <div class="card" onclick="go('session')">
+            <div style="flex:1"><div class="idx" style="color:var(--mint)">02</div><b>Push-up</b><div class="muted">Elbows and a straight line</div></div>
+            <div class="go" style="background:var(--mint)">→</div>
+          </div>
+          <div class="card" onclick="go('session')">
+            <div style="flex:1"><div class="idx" style="color:var(--amber)">03</div><b>Plank</b><div class="muted">Hold a single line</div></div>
+            <div class="go" style="background:var(--amber)">→</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;color:var(--lime);cursor:pointer" onclick="go('history')">History →</div>
+      </section>
+
+      <section class="view cam" id="session">
+        <div class="row" style="justify-content:space-between">
+          <span onclick="go('home')" style="cursor:pointer;opacity:.8">✕</span>
+          <div><div class="tiny" style="color:var(--lime)">SQUAT</div><div>0:18</div></div>
+          <span style="opacity:.7">⟳</span>
+        </div>
+        <div style="margin-top:16px;background:#07090873;border-radius:16px;padding:10px 12px;color:var(--amber)">I need your full body in frame</div>
+        <p class="hint">Stand side-on. Full body in frame. Phone ~2.5 m away.</p>
+        <div class="hud">
+          <div class="row" style="align-items:flex-end">
+            <div class="big">0</div>
+            <div class="tiny" style="margin:0 0 10px 8px">REPS</div>
+            <div style="margin-left:auto;text-align:right"><div class="tiny">FORM</div><div style="font-size:28px;color:var(--lime)">100</div></div>
+          </div>
+          <div style="height:6px;background:#ffffff14;border-radius:99px;margin:10px 0 14px"><div style="width:92%;height:100%;background:var(--lime);border-radius:99px"></div></div>
+          <button class="btn" onclick="go('recap')">End set</button>
+        </div>
+      </section>
+
+      <section class="view" id="recap">
+        <div class="tiny" style="text-align:center">SET CLOSED</div>
+        <h2 style="text-align:center;font-size:36px;margin:6px 0 8px">Squat</h2>
+        <div class="score"><b>87</b></div>
+        <div class="tiny" style="text-align:center;margin-top:-8px">FORM</div>
+        <div class="row" style="gap:10px;margin-top:20px">
+          <div class="card" style="flex:1;display:block"><div class="tiny">REPS</div><b>8</b></div>
+          <div class="card" style="flex:1;display:block"><div class="tiny">TIME</div><b>0:42</b></div>
+        </div>
+        <div class="card" style="margin-top:10px;display:block"><div class="tiny">MOST COMMON CUE</div><b>Sit your hips back</b></div>
+        <button class="btn" onclick="go('session')">Go again</button>
+        <button class="btn" style="margin-top:10px;background:var(--fog)" onclick="go('home')">Home</button>
+      </section>
+
+      <section class="view" id="history">
+        <div class="row" style="gap:10px;margin-bottom:16px">
+          <span onclick="go('home')" style="cursor:pointer">←</span>
+          <h3>History</h3>
+        </div>
+        <div class="card" style="height:88px;align-items:flex-end;gap:8px">
+          <div style="flex:1;height:28%;background:#5e675f40;border-radius:8px"></div>
+          <div style="flex:1;height:48%;background:var(--lime);border-radius:8px"></div>
+          <div style="flex:1;height:18%;background:#5e675f40;border-radius:8px"></div>
+          <div style="flex:1;height:70%;background:var(--lime);border-radius:8px"></div>
+          <div style="flex:1;height:22%;background:#5e675f40;border-radius:8px"></div>
+          <div style="flex:1;height:40%;background:var(--lime);border-radius:8px"></div>
+          <div style="flex:1;height:12%;background:#5e675f40;border-radius:8px"></div>
+        </div>
+        <div class="card" style="margin-top:12px;display:block">
+          <div class="idx">SQUAT</div>
+          <b>8 reps · form 87</b>
+          <div class="muted">today · Sit your hips back</div>
+        </div>
+        <p class="hint" style="margin-top:auto">Настоящая история пишется в Room после каждого сета.</p>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const labels = [
+      ["splash", "1. Загрузка", "Неон, орбиты, иконка AXIS"],
+      ["on1", "2. Онбординг", "Что это за коуч"],
+      ["on2", "3. Постановка телефона", "2–3 м, боком, всё тело"],
+      ["on3", "4. Камера", "Всё на устройстве, без облака"],
+      ["home", "5. Главная", "Squat / Push-up / Plank"],
+      ["session", "6. Сет", "Камера, скелет, счёт, подсказки"],
+      ["recap", "7. Итог", "Оценка техники и повтор"],
+      ["history", "8. История", "Сеты и недельный график"],
+    ];
+    const steps = document.getElementById("steps");
+    labels.forEach(([id, t, s], i) => {
+      const el = document.createElement("div");
+      el.className = "step" + (i === 0 ? " active" : "");
+      el.innerHTML = `<div class="n">${i+1}</div><div><b>${t}</b><span>${s}</span></div>`;
+      el.onclick = () => go(id);
+      steps.appendChild(el);
+    });
+    function go(id) {
+      document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === id));
+      document.querySelectorAll(".step").forEach((s, i) => s.classList.toggle("active", labels[i][0] === id));
+    }
+    setTimeout(() => { if (document.getElementById("splash").classList.contains("on")) go("on1"); }, 2400);
+  </script>
+</body>
+</html>
