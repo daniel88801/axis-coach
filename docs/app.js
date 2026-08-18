@@ -9,9 +9,9 @@ if (tg) {
 }
 
 const EX = {
-  squat: { title: "Squat", metric: "reps", color: "#c6f135" },
-  push_up: { title: "Push-up", metric: "reps", color: "#5ee0b5" },
-  plank: { title: "Plank", metric: "sec", color: "#ffc14a" },
+  squat: { title: "Присед", metric: "повт", color: "#c6f135" },
+  push_up: { title: "Отжимания", metric: "повт", color: "#5ee0b5" },
+  plank: { title: "Планка", metric: "сек", color: "#ffc14a" },
 };
 
 const L = { LS: 11, RS: 12, LE: 13, RE: 14, LW: 15, RW: 16, LH: 23, RH: 24, LK: 25, RK: 26, LA: 27, RA: 28 };
@@ -72,7 +72,7 @@ class Analyzer {
   analyze(lm, now) {
     const side = pickSide(lm);
     if (!side || side.vis < 0.45) {
-      return { person: false, reps: this.machine.reps, hold: this.hold, score: Math.round(this.score), cue: "I need your full body in frame", color: "var(--amber)", newRep: false };
+      return { person: false, reps: this.machine.reps, hold: this.hold, score: Math.round(this.score), cue: "Нужно всё тело в кадре", color: "var(--amber)", newRep: false };
     }
     let cue = null, color = "var(--fog)", penalty = 0, counted = false;
     if (this.kind === "plank") {
@@ -80,24 +80,24 @@ class Analyzer {
       const dt = this.lastT == null ? 0 : Math.min(80, now - this.lastT);
       this.lastT = now;
       if (align <= 18) this.hold += dt;
-      if (align > 18) { cue = side.h.y > (side.s.y + side.a.y) / 2 ? "Hips up — one straight line" : "Hips down — don't pike"; color = "var(--amber)"; penalty = 22; }
-      else if (align > 10) { cue = "Brace your core"; color = "var(--amber)"; penalty = 8; }
+      if (align > 18) { cue = side.h.y > (side.s.y + side.a.y) / 2 ? "Таз выше — одна линия" : "Таз ниже — не поднимай"; color = "var(--amber)"; penalty = 22; }
+      else if (align > 10) { cue = "Напряги корпус"; color = "var(--amber)"; penalty = 8; }
     } else if (this.kind === "squat") {
       const knee = angle(side.h, side.k, side.a);
       const hip = angle(side.s, side.h, side.k);
       counted = this.machine.onAngle(knee, now);
       const shin = Math.max(0.05, Math.hypot(side.k.x - side.a.x, side.k.y - side.a.y));
       const fwd = Math.abs(side.k.x - side.a.x) / shin;
-      if ((this.machine.phase === "bottom" || this.machine.phase === "down") && hip < 55) { cue = "Chest up"; penalty = 18; color = "var(--amber)"; }
-      else if (fwd > 0.85 && knee < 150) { cue = "Sit your hips back"; penalty = 14; color = "var(--amber)"; }
-      if (this.machine.phase === "up" && this.machine.lowest > 118) { cue = "A little deeper"; penalty = 16; color = "var(--amber)"; }
-      if (counted && !cue) { cue = "Clean"; color = "var(--lime)"; }
+      if ((this.machine.phase === "bottom" || this.machine.phase === "down") && hip < 55) { cue = "Грудь вверх"; penalty = 18; color = "var(--amber)"; }
+      else if (fwd > 0.85 && knee < 150) { cue = "Садись тазом назад"; penalty = 14; color = "var(--amber)"; }
+      if (this.machine.phase === "up" && this.machine.lowest > 118) { cue = "Чуть глубже"; penalty = 16; color = "var(--amber)"; }
+      if (counted && !cue) { cue = "Чисто"; color = "var(--lime)"; }
     } else {
       const elbow = angle(side.s, side.e, side.w);
       const align = 180 - angle(side.s, side.h, side.a);
       counted = this.machine.onAngle(elbow, now);
-      if (align > 22) { cue = side.h.y < (side.s.y + side.a.y) / 2 ? "Hips down — don't pike" : "Hips up — one straight line"; penalty = 18; color = "var(--amber)"; }
-      if (counted && !cue) { cue = "Clean"; color = "var(--lime)"; }
+      if (align > 22) { cue = side.h.y < (side.s.y + side.a.y) / 2 ? "Таз ниже — не поднимай" : "Таз выше — одна линия"; penalty = 18; color = "var(--amber)"; }
+      if (counted && !cue) { cue = "Чисто"; color = "var(--lime)"; }
     }
     if (cue && color !== "var(--lime)") this.cues[cue] = (this.cues[cue] || 0) + 1;
     this.score = this.score * 0.82 + (100 - penalty) * 0.18;
@@ -136,20 +136,20 @@ function saveHistory(list) { localStorage.setItem("axis.sessions", JSON.stringif
 
 function refreshHome() {
   const n = loadHistory().length;
-  document.getElementById("pill").textContent = n ? `${n} LOGGED` : "FIRST SESSION";
+  document.getElementById("pill").textContent = n ? `${n} СЕТОВ` : "ПЕРВЫЙ СЕТ";
 }
 
 function renderHistory() {
   const box = document.getElementById("histList");
   const items = loadHistory();
   if (!items.length) {
-    box.innerHTML = `<div class="muted" style="padding:20px 0">No sets yet. Film one.</div>`;
+    box.innerHTML = `<div class="muted" style="padding:20px 0">Сетов пока нет. Сними первый.</div>`;
     return;
   }
   box.innerHTML = items.map((s) => `
     <div class="card" style="display:block">
       <div class="idx" style="color:${EX[s.exercise]?.color || "var(--lime)"}">${EX[s.exercise]?.title || s.exercise}</div>
-      <b>${s.exercise === "plank" ? s.hold + "s" : s.reps + " reps"} · form ${s.score}</b>
+      <b>${s.exercise === "plank" ? s.hold + " сек" : s.reps + " повт"} · техника ${s.score}</b>
       <div class="muted">${new Date(s.ended).toLocaleString()}</div>
     </div>
   `).join("");
@@ -221,7 +221,7 @@ function loop() {
       document.getElementById("formScore").textContent = v.score;
       document.getElementById("formBar").style.width = `${v.score}%`;
       const cue = document.getElementById("cue");
-      cue.textContent = v.cue || (v.person ? "Hold the line" : "Step into frame");
+      cue.textContent = v.cue || (v.person ? "Держи линию" : "Зайди в кадр");
       cue.style.color = v.color || "var(--fog)";
       if (v.newRep && navigator.vibrate) navigator.vibrate(30);
     }
@@ -252,7 +252,7 @@ async function openSession(ex) {
     clearInterval(state.timer);
     state.timer = setInterval(tickClock, 250);
   } catch (err) {
-    document.getElementById("cue").textContent = "Camera permission needed";
+    document.getElementById("cue").textContent = "Нужен доступ к камере";
   }
 }
 

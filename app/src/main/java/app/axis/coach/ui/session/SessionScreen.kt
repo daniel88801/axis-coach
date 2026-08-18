@@ -149,7 +149,7 @@ fun SessionScreen(
             )
         } else {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Camera permission needed", color = FogDim)
+                Text("Нужен доступ к камере", color = FogDim)
             }
         }
 
@@ -190,7 +190,7 @@ fun SessionScreen(
 
             Spacer(Modifier.height(18.dp))
             AnimatedContent(
-                targetState = state.cue ?: if (state.personDetected) "Hold the line" else "Step into frame",
+                targetState = state.cue ?: if (state.personDetected) "Держи линию" else "Зайди в кадр",
                 transitionSpec = { fadeIn(axisSpring()) togetherWith fadeOut() },
                 label = "cueText",
             ) { text ->
@@ -250,7 +250,7 @@ private fun SessionHud(
             Text(label, style = AxisTypography.labelLarge, color = FogDim, modifier = Modifier.padding(bottom = 12.dp))
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
-                Text("FORM", style = AxisTypography.labelSmall, color = FogDim)
+                Text("ТЕХНИКА", style = AxisTypography.labelSmall, color = FogDim)
                 Text("${state.formScore}", style = AxisTypography.headlineLarge, color = accent)
             }
         }
@@ -280,7 +280,7 @@ private fun SessionHud(
                 .clickable(onClick = onEnd),
             contentAlignment = Alignment.Center,
         ) {
-            Text("End set", style = AxisTypography.titleMedium, color = Ink)
+            Text("Закончить сет", style = AxisTypography.titleMedium, color = Ink)
         }
     }
 }

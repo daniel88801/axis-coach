@@ -130,61 +130,61 @@
           <img class="brand lg" src="app_icon.png" alt="AXIS" />
         </div>
         <h2>AXIS</h2>
-        <div class="coach" style="color:var(--cyan);margin-top:6px">FORM IN REAL TIME</div>
+        <div class="coach" style="color:var(--cyan);margin-top:6px">ТЕХНИКА В РЕАЛЬНОМ ВРЕМЕНИ</div>
         <div class="bar"><i></i></div>
       </section>
 
       <section class="view" id="on1">
         <img class="brand lg" src="app_icon.png" alt="" />
         <h2 style="font-size:40px;margin:28px 0 12px">AXIS</h2>
-        <p class="muted">A live coach that reads your skeleton, counts the work, and talks when the line breaks.</p>
-        <button class="btn" onclick="go('on2')">Begin</button>
+        <p class="muted">Живой тренер: читает скелет, считает повторы и говорит, когда ломается линия.</p>
+        <button class="btn" onclick="go('on2')">Начать</button>
       </section>
 
       <section class="view" id="on2">
         <img class="brand lg" src="app_icon.png" alt="" />
-        <h2 style="font-size:34px;margin:28px 0 12px">Place the phone</h2>
+        <h2 style="font-size:34px;margin:28px 0 12px">Поставь телефон</h2>
         <p class="muted">Lean it 2–3 meters away. Side-on for squat and push-up. Whole body in the frame.</p>
-        <button class="btn" onclick="go('on3')">Got it</button>
+        <button class="btn" onclick="go('on3')">Понятно</button>
       </section>
 
       <section class="view" id="on3">
         <img class="brand lg" src="app_icon.png" alt="" />
-        <h2 style="font-size:34px;margin:28px 0 12px">Camera + voice</h2>
+        <h2 style="font-size:34px;margin:28px 0 12px">Камера и голос</h2>
         <p class="muted">AXIS watches on-device. Nothing leaves the phone. Allow camera to start.</p>
-        <button class="btn cyan" onclick="go('home')">Allow camera</button>
+        <button class="btn cyan" onclick="go('home')">Разрешить камеру</button>
       </section>
 
       <section class="view" id="home">
         <div class="row" style="justify-content:space-between">
           <img class="brand" src="app_icon.png" alt="" />
-          <div class="pill">FIRST SESSION</div>
+          <div class="pill">ПЕРВЫЙ СЕТ</div>
         </div>
         <h2 class="hero" style="margin-top:22px">AXIS</h2>
         <div class="coach">COACH</div>
-        <p class="muted" style="margin:10px 0 22px">On-device pose. Live cues. No cloud.</p>
+        <p class="muted" style="margin:10px 0 22px">Поза на устройстве. Живые подсказки. Без облака.</p>
         <div class="tiny">CHOOSE A LIFT</div>
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
           <div class="card" onclick="go('session')">
-            <div style="flex:1"><div class="idx">01</div><b>Squat</b><div class="muted">Depth, knees, torso</div></div>
+            <div style="flex:1"><div class="idx">01</div><b>Присед</b><div class="muted">Глубина, колени, корпус</div></div>
             <div class="go">→</div>
           </div>
           <div class="card" onclick="go('session')">
-            <div style="flex:1"><div class="idx" style="color:var(--mint)">02</div><b>Push-up</b><div class="muted">Elbows and a straight line</div></div>
+            <div style="flex:1"><div class="idx" style="color:var(--mint)">02</div><b>Отжимания</b><div class="muted">Локти и прямая линия</div></div>
             <div class="go" style="background:var(--mint)">→</div>
           </div>
           <div class="card" onclick="go('session')">
-            <div style="flex:1"><div class="idx" style="color:var(--amber)">03</div><b>Plank</b><div class="muted">Hold a single line</div></div>
+            <div style="flex:1"><div class="idx" style="color:var(--amber)">03</div><b>Планка</b><div class="muted">Держи одну линию</div></div>
             <div class="go" style="background:var(--amber)">→</div>
           </div>
         </div>
-        <div style="margin-top:14px;color:var(--lime);cursor:pointer" onclick="go('history')">History →</div>
+        <div style="margin-top:14px;color:var(--lime);cursor:pointer" onclick="go('history')">История →</div>
       </section>
 
       <section class="view cam" id="session">
         <div class="row" style="justify-content:space-between">
           <span onclick="go('home')" style="cursor:pointer;opacity:.8">✕</span>
-          <div><div class="tiny" style="color:var(--lime)">SQUAT</div><div>0:18</div></div>
+          <div><div class="tiny" style="color:var(--lime)">ПРИСЕД</div><div>0:18</div></div>
           <span style="opacity:.7">⟳</span>
         </div>
         <div style="margin-top:16px;background:#07090873;border-radius:16px;padding:10px 12px;color:var(--amber)">I need your full body in frame</div>
@@ -193,31 +193,31 @@
           <div class="row" style="align-items:flex-end">
             <div class="big">0</div>
             <div class="tiny" style="margin:0 0 10px 8px">REPS</div>
-            <div style="margin-left:auto;text-align:right"><div class="tiny">FORM</div><div style="font-size:28px;color:var(--lime)">100</div></div>
+            <div style="margin-left:auto;text-align:right"><div class="tiny">ТЕХНИКА</div><div style="font-size:28px;color:var(--lime)">100</div></div>
           </div>
           <div style="height:6px;background:#ffffff14;border-radius:99px;margin:10px 0 14px"><div style="width:92%;height:100%;background:var(--lime);border-radius:99px"></div></div>
-          <button class="btn" onclick="go('recap')">End set</button>
+          <button class="btn" onclick="go('recap')">Закончить сет</button>
         </div>
       </section>
 
       <section class="view" id="recap">
         <div class="tiny" style="text-align:center">SET CLOSED</div>
-        <h2 style="text-align:center;font-size:36px;margin:6px 0 8px">Squat</h2>
+        <h2 style="text-align:center;font-size:36px;margin:6px 0 8px">Присед</h2>
         <div class="score"><b>87</b></div>
-        <div class="tiny" style="text-align:center;margin-top:-8px">FORM</div>
+        <div class="tiny" style="text-align:center;margin-top:-8px">ТЕХНИКА</div>
         <div class="row" style="gap:10px;margin-top:20px">
           <div class="card" style="flex:1;display:block"><div class="tiny">REPS</div><b>8</b></div>
           <div class="card" style="flex:1;display:block"><div class="tiny">TIME</div><b>0:42</b></div>
         </div>
         <div class="card" style="margin-top:10px;display:block"><div class="tiny">MOST COMMON CUE</div><b>Sit your hips back</b></div>
-        <button class="btn" onclick="go('session')">Go again</button>
-        <button class="btn" style="margin-top:10px;background:var(--fog)" onclick="go('home')">Home</button>
+        <button class="btn" onclick="go('session')">Ещё раз</button>
+        <button class="btn" style="margin-top:10px;background:var(--fog)" onclick="go('home')">На главную</button>
       </section>
 
       <section class="view" id="history">
         <div class="row" style="gap:10px;margin-bottom:16px">
           <span onclick="go('home')" style="cursor:pointer">←</span>
-          <h3>History</h3>
+          <h3>История</h3>
         </div>
         <div class="card" style="height:88px;align-items:flex-end;gap:8px">
           <div style="flex:1;height:28%;background:#5e675f40;border-radius:8px"></div>
@@ -229,8 +229,8 @@
           <div style="flex:1;height:12%;background:#5e675f40;border-radius:8px"></div>
         </div>
         <div class="card" style="margin-top:12px;display:block">
-          <div class="idx">SQUAT</div>
-          <b>8 reps · form 87</b>
+          <div class="idx">ПРИСЕД</div>
+          <b>8 повт · техника 87</b>
           <div class="muted">today · Sit your hips back</div>
         </div>
         <p class="hint" style="margin-top:auto">Настоящая история пишется в Room после каждого сета.</p>

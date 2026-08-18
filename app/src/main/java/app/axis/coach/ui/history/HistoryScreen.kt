@@ -65,14 +65,14 @@ fun HistoryScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = Fog)
+                Icon(Icons.Outlined.ArrowBack, contentDescription = "Назад", tint = Fog)
             }
-            Text("History", style = AxisTypography.headlineMedium, color = Fog)
+            Text("История", style = AxisTypography.headlineMedium, color = Fog)
         }
 
         if (sessions.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No sets yet. Film one.", color = FogDim)
+                Text("Сетов пока нет. Сними первый.", color = FogDim)
             }
             return
         }
@@ -100,9 +100,9 @@ fun HistoryScreen(
                     Spacer(Modifier.height(4.dp))
                     Text(
                         if (session.exercise == Exercise.PLANK) {
-                            "${session.holdSeconds}s  ·  form ${session.formScore}"
+                            "${session.holdSeconds} сек  ·  техника ${session.formScore}"
                         } else {
-                            "${session.reps} reps  ·  form ${session.formScore}"
+                            "${session.reps} повт  ·  техника ${session.formScore}"
                         },
                         style = AxisTypography.titleMedium,
                         color = Fog,

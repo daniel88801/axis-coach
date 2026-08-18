@@ -57,9 +57,9 @@ fun OnboardingScreen(
     }
 
     val pages = listOf(
-        Triple("AXIS", "A live coach that reads your skeleton, counts the work, and talks when the line breaks.", "Begin"),
-        Triple("Place the phone", "Lean it 2–3 meters away. Side-on for squat and push-up. Whole body in the frame.", "Got it"),
-        Triple("Camera + voice", "AXIS watches on-device. Nothing leaves the phone. Allow camera to start.", "Allow camera"),
+        Triple("AXIS", "Живой тренер: читает скелет, считает повторы и говорит, когда ломается линия.", "Начать"),
+        Triple("Поставь телефон", "На 2–3 метра. Боком для приседа и отжиманий. Всё тело в кадре.", "Понятно"),
+        Triple("Камера и голос", "AXIS смотрит на устройстве. Ничего не уходит в облако. Разреши камеру.", "Разрешить камеру"),
     )
     val current = pages[page]
 
@@ -116,7 +116,7 @@ fun OnboardingScreen(
         if (page == pages.lastIndex) {
             Spacer(Modifier.height(12.dp))
             Text(
-                "You can still explore the app if you skip. Live coaching needs the camera.",
+                "Можно смотреть приложение и без этого. Живой разбор техники нуждается в камере.",
                 style = AxisTypography.bodyMedium,
                 color = FogMute,
                 modifier = Modifier.fillMaxWidth(),

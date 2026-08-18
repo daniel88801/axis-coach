@@ -74,14 +74,14 @@ fun HomeScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             AxisBrand(size = 52.dp)
             Spacer(Modifier.weight(1f))
-            AxisPill(if (state.sessionCount == 0) "first session" else "${state.sessionCount} logged")
+            AxisPill(if (state.sessionCount == 0) "первый сет" else "${state.sessionCount} сетов")
         }
         Spacer(Modifier.height(28.dp))
         Text("AXIS", style = AxisTypography.displayLarge, color = Fog)
-        Text("COACH", style = AxisTypography.labelLarge, color = Lime)
+        Text("ТРЕНЕР", style = AxisTypography.labelLarge, color = Lime)
         Spacer(Modifier.height(10.dp))
         Text(
-            "On-device pose. Live cues. No cloud.",
+            "Поза на устройстве. Живые подсказки. Без облака.",
             style = AxisTypography.bodyLarge,
             color = FogDim,
         )
@@ -97,10 +97,10 @@ fun HomeScreen(
                     .padding(16.dp),
             ) {
                 Column {
-                    Text("LAST SET", style = AxisTypography.labelSmall, color = FogMute)
+                    Text("ПОСЛЕДНИЙ СЕТ", style = AxisTypography.labelSmall, color = FogMute)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "${last.exercise.title}  ·  score ${last.formScore}",
+                        "${last.exercise.title}  ·  техника ${last.formScore}",
                         style = AxisTypography.titleMedium,
                         color = Fog,
                     )
@@ -115,7 +115,7 @@ fun HomeScreen(
             Spacer(Modifier.height(20.dp))
         }
 
-        Text("CHOOSE A LIFT", style = AxisTypography.labelSmall, color = FogMute)
+        Text("ВЫБЕРИ УПРАЖНЕНИЕ", style = AxisTypography.labelSmall, color = FogMute)
         Spacer(Modifier.height(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Exercise.entries.forEach { exercise ->
@@ -132,8 +132,8 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Evening reminder", style = AxisTypography.titleMedium, color = Fog)
-                Text("19:00 · stay consistent", style = AxisTypography.bodyMedium, color = FogDim)
+                Text("Вечернее напоминание", style = AxisTypography.titleMedium, color = Fog)
+                Text("19:00 · не срывай ритм", style = AxisTypography.bodyMedium, color = FogDim)
             }
             Switch(
                 checked = state.remindersOn,
@@ -147,7 +147,7 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            "History →",
+            "История →",
             style = AxisTypography.titleMedium,
             color = Lime,
             modifier = Modifier

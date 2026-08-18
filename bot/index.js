@@ -19,26 +19,26 @@ if (!token) {
 const bot = new TelegramBot(token, { polling: true });
 
 const keyboard = {
-  keyboard: [[{ text: "Open AXIS", web_app: { url: webAppUrl } }]],
+  keyboard: [[{ text: "Открыть AXIS", web_app: { url: webAppUrl } }]],
   resize_keyboard: true,
 };
 
 const inline = {
-  inline_keyboard: [[{ text: "Open AXIS", web_app: { url: webAppUrl } }]],
+  inline_keyboard: [[{ text: "Открыть AXIS", web_app: { url: webAppUrl } }]],
 };
 
 bot.onText(/\/start/, async (msg) => {
-  const name = msg.from?.first_name || "athlete";
+  const name = msg.from?.first_name || "атлет";
   await bot.sendMessage(
     msg.chat.id,
-    `AXIS is ready, ${name}.\n\nLive form coach inside Telegram: squat, push-up, plank. Camera stays on your phone.\n\nTap Open AXIS below.`,
+    `AXIS готов, ${name}.\n\nЖивой тренер техники внутри Telegram: присед, отжимания, планка. Камера остаётся на телефоне.\n\nНажми «Открыть AXIS» ниже.`,
     { reply_markup: keyboard },
   );
-  await bot.sendMessage(msg.chat.id, "Or open it as a Mini App:", { reply_markup: inline });
+  await bot.sendMessage(msg.chat.id, "Или открой как мини-приложение:", { reply_markup: inline });
 });
 
 bot.onText(/\/app/, async (msg) => {
-  await bot.sendMessage(msg.chat.id, "Open AXIS", { reply_markup: inline });
+  await bot.sendMessage(msg.chat.id, "Открыть AXIS", { reply_markup: inline });
 });
 
 bot.on("polling_error", (err) => {

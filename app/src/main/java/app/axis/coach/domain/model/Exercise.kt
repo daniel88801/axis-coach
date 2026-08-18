@@ -10,27 +10,27 @@ enum class Exercise(
 ) {
     SQUAT(
         id = "squat",
-        title = "Squat",
+        title = "Присед",
         indexLabel = "01",
-        blurb = "Depth, knees, torso",
-        setupHint = "Stand side-on. Full body in frame. Phone ~2.5 m away.",
-        metricLabel = "reps",
+        blurb = "Глубина, колени, корпус",
+        setupHint = "Встань боком. Всё тело в кадре. Телефон примерно в 2,5 м.",
+        metricLabel = "повт",
     ),
     PUSH_UP(
         id = "push_up",
-        title = "Push-up",
+        title = "Отжимания",
         indexLabel = "02",
-        blurb = "Elbows and a straight line",
-        setupHint = "Side-on on the floor. Head to heels visible.",
-        metricLabel = "reps",
+        blurb = "Локти и прямая линия",
+        setupHint = "Боком на полу. От головы до пяток в кадре.",
+        metricLabel = "повт",
     ),
     PLANK(
         id = "plank",
-        title = "Plank",
+        title = "Планка",
         indexLabel = "03",
-        blurb = "Hold a single line",
-        setupHint = "Side-on. Shoulders, hips and ankles in one line.",
-        metricLabel = "sec",
+        blurb = "Держи одну линию",
+        setupHint = "Боком. Плечи, таз и лодыжки на одной линии.",
+        metricLabel = "сек",
     );
 
     companion object {

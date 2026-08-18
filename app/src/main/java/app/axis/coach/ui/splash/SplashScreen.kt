@@ -159,7 +159,7 @@ fun AxisSplash() {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "FORM IN REAL TIME",
+                text = "ТЕХНИКА В РЕАЛЬНОМ ВРЕМЕНИ",
                 style = AxisTypography.labelSmall,
                 color = Cyan,
             )

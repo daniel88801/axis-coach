@@ -27,7 +27,7 @@ class ReminderWorker @AssistedInject constructor(
             manager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
-                    "AXIS reminders",
+                    "Напоминания AXIS",
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ),
             )
@@ -41,7 +41,7 @@ class ReminderWorker @AssistedInject constructor(
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_axis)
             .setContentTitle("AXIS")
-            .setContentText("Ten focused minutes. Pick a lift and start.")
+            .setContentText("Десять минут фокуса. Выбери упражнение и начни.")
             .setContentIntent(launch)
             .setAutoCancel(true)
             .build()

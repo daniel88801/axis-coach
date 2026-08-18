@@ -54,7 +54,7 @@ fun RecapRoute(
         Modifier.fillMaxSize().background(Ink),
         contentAlignment = Alignment.Center,
     ) {
-        Text("Saving set…", color = FogDim)
+        Text("Сохраняю сет…", color = FogDim)
     }
 }
 
@@ -84,7 +84,7 @@ fun RecapScreen(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("SET CLOSED", style = AxisTypography.labelSmall, color = FogMute)
+        Text("СЕТ ЗАКРЫТ", style = AxisTypography.labelSmall, color = FogMute)
         Spacer(Modifier.height(8.dp))
         Text(session.exercise.title, style = AxisTypography.displayMedium, color = Fog)
         Spacer(Modifier.height(28.dp))
@@ -109,7 +109,7 @@ fun RecapScreen(
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("${session.formScore}", style = AxisTypography.displayMedium, color = Fog)
-                Text("FORM", style = AxisTypography.labelSmall, color = FogMute)
+                Text("ТЕХНИКА", style = AxisTypography.labelSmall, color = FogMute)
             }
         }
 
@@ -119,17 +119,17 @@ fun RecapScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             val work = if (session.exercise == Exercise.PLANK) "${session.holdSeconds}s" else "${session.reps}"
-            val workLabel = if (session.exercise == Exercise.PLANK) "hold" else "reps"
+            val workLabel = if (session.exercise == Exercise.PLANK) "удерж." else "повт"
             StatChip(workLabel, work, Modifier.weight(1f))
-            StatChip("time", "%d:%02d".format(minutes, seconds), Modifier.weight(1f))
+            StatChip("время", "%d:%02d".format(minutes, seconds), Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         session.topCue?.let { cue ->
-            StatChip("most common cue", cue, Modifier.fillMaxWidth())
+            StatChip("частая подсказка", cue, Modifier.fillMaxWidth())
         }
         Spacer(Modifier.weight(1f))
-        AxisPrimaryButton("Go again", onAgain, color = accent)
+        AxisPrimaryButton("Ещё раз", onAgain, color = accent)
         Spacer(Modifier.height(12.dp))
-        AxisPrimaryButton("Home", onHome, color = Fog)
+        AxisPrimaryButton("На главную", onHome, color = Fog)
     }
 }
