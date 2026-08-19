@@ -575,25 +575,6 @@ async function initPose() {
   }
 }
 
-async function openCameraStream() {
-  const facing = state.facing === "user" ? "user" : "environment";
-  const tries = [
-    { video: { facingMode: { exact: facing } }, audio: false },
-    { video: { facingMode: { ideal: facing } }, audio: false },
-    { video: { facingMode: facing }, audio: false },
-    { video: true, audio: false },
-  ];
-  let lastErr;
-  for (const constraints of tries) {
-    try {
-      return await navigator.mediaDevices.getUserMedia(constraints);
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr || new Error("camera");
-}
-
 function cameraLive() {
   const track = state.stream?.getVideoTracks?.()[0];
   return !!(track && track.readyState === "live");
@@ -607,37 +588,75 @@ function releaseCamera() {
   if (video) video.srcObject = null;
 }
 
-async function startCamera() {
+function syncMirror() {
+  /* Do not CSS-flip <video> in Telegram: WebView often paints a black frame. */
+}
+
+async function openCameraStream() {
+  const md = navigator.mediaDevices;
+  if (!md?.getUserMedia) throw new Error("no-media");
+  const facing = state.facing === "environment" ? "environment" : "user";
+  const tries = [
+    { video: { facingMode: facing }, audio: false },
+    { video: { facingMode: { ideal: facing } }, audio: false },
+    { video: true, audio: false },
+  ];
+  let lastErr;
+  for (const constraints of tries) {
+    try {
+      return await md.getUserMedia(constraints);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error("camera");
+}
+
+async function attachAndPlay(stream) {
   const video = document.getElementById("cam");
   video.setAttribute("playsinline", "true");
   video.setAttribute("webkit-playsinline", "true");
+  video.setAttribute("autoplay", "true");
   video.muted = true;
   video.playsInline = true;
-  if (cameraLive() && state.streamFacing === state.facing) {
-    if (video.srcObject !== state.stream) video.srcObject = state.stream;
+  video.autoplay = true;
+  if (video.srcObject !== stream) video.srcObject = stream;
+  if (video.readyState < 2) {
+    await Promise.race([
+      new Promise((resolve) => {
+        video.addEventListener("loadedmetadata", resolve, { once: true });
+        video.addEventListener("canplay", resolve, { once: true });
+      }),
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+    ]);
+  }
+  try {
     await video.play();
+  } catch { /* Telegram autoplay */ }
+}
+
+async function startCamera() {
+  syncMirror();
+  if (cameraLive() && state.streamFacing === state.facing) {
+    await attachAndPlay(state.stream);
     return;
   }
   if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
   state.stream = await openCameraStream();
   state.streamFacing = state.facing;
   try { localStorage.setItem("axis.facing", state.facing); } catch { /* ignore */ }
-  const track = state.stream.getVideoTracks()[0];
-  try {
-    const caps = track.getCapabilities?.() || {};
-    if (caps.zoom && typeof caps.zoom.min === "number") {
-      await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
-    }
-  } catch { /* zoom not supported */ }
-  video.srcObject = state.stream;
-  await video.play();
+  await attachAndPlay(state.stream);
 }
 
 function drawPose(lm, w, h) {
   const canvas = document.getElementById("overlay");
   const ctx = canvas.getContext("2d");
-  canvas.width = w; canvas.height = h;
-  ctx.clearRect(0, 0, w, h);
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  } else {
+    ctx.clearRect(0, 0, w, h);
+  }
   if (!lm) return;
   ctx.lineWidth = 4;
   ctx.strokeStyle = "#c6f135";
@@ -661,23 +680,25 @@ let lastVideoTime = -1;
 function loop() {
   if (!state.running) return;
   const video = document.getElementById("cam");
-  if (state.landmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
-    lastVideoTime = video.currentTime;
-    const res = state.landmarker.detectForVideo(video, performance.now());
-    const lm = res.landmarks?.[0];
-    drawPose(lm, video.videoWidth || 720, video.videoHeight || 1280);
-    if (lm && state.analyzer) {
-      const v = state.analyzer.analyze(lm, performance.now());
-      const isPlank = state.exercise === "plank";
-      document.getElementById("metric").textContent = isPlank ? Math.floor(v.hold / 1000) : v.reps;
-      document.getElementById("formScore").textContent = v.score;
-      document.getElementById("formBar").style.width = `${v.score}%`;
-      const cue = document.getElementById("cue");
-      cue.textContent = v.cue || (v.person ? "Держи линию" : "Зайди в кадр");
-      cue.style.color = v.color || "var(--fog)";
-      if (v.newRep && navigator.vibrate) navigator.vibrate(30);
+  try {
+    if (state.landmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      const res = state.landmarker.detectForVideo(video, performance.now());
+      const lm = res.landmarks?.[0];
+      drawPose(lm, video.videoWidth || 720, video.videoHeight || 1280);
+      if (lm && state.analyzer) {
+        const v = state.analyzer.analyze(lm, performance.now());
+        const isPlank = state.exercise === "plank";
+        document.getElementById("metric").textContent = isPlank ? Math.floor(v.hold / 1000) : v.reps;
+        document.getElementById("formScore").textContent = v.score;
+        document.getElementById("formBar").style.width = `${v.score}%`;
+        const cue = document.getElementById("cue");
+        cue.textContent = v.cue || (v.person ? "Держи линию" : "Зайди в кадр");
+        cue.style.color = v.color || "var(--fog)";
+        if (v.newRep && navigator.vibrate) navigator.vibrate(30);
+      }
     }
-  }
+  } catch { /* keep preview even if pose throws */ }
   requestAnimationFrame(loop);
 }
 
@@ -703,8 +724,10 @@ async function openSession(ex) {
     loop();
     clearInterval(state.timer);
     state.timer = setInterval(tickClock, 250);
+    document.getElementById("cue").textContent = "Зайди в кадр";
   } catch (err) {
-    document.getElementById("cue").textContent = "Нужен доступ к камере";
+    const reason = err?.name === "NotAllowedError" ? "Разреши камеру в Telegram" : "Камера не открылась — нажми ещё раз";
+    document.getElementById("cue").textContent = reason;
     return;
   }
   try {
