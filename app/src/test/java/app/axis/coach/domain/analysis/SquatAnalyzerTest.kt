@@ -10,32 +10,59 @@ class SquatAnalyzerTest {
     @Test
     fun standingToBottomToStandCountsRep() {
         val analyzer = SquatAnalyzer()
-        analyzer.analyze(pose(kneeY = 0.45f, hipY = 0.30f, t = 0))
-        analyzer.analyze(pose(kneeY = 0.58f, hipY = 0.52f, t = 80))
-        val bottom = analyzer.analyze(pose(kneeY = 0.70f, hipY = 0.68f, t = 160))
-        val top = analyzer.analyze(pose(kneeY = 0.45f, hipY = 0.30f, t = 800))
-        assertTrue(bottom.personDetected)
+        val stand0 = analyzer.analyze(stand(0))
+        analyzer.analyze(stand(40))
+        analyzer.analyze(bottom(200))
+        analyzer.analyze(bottom(280))
+        analyzer.analyze(bottom(360))
+        val top = analyzer.analyze(stand(900))
+        assertTrue(stand0.personDetected)
+        assertTrue(
+            "knee=${top.kneeAngle} phase=${top.phase} reps=${top.reps} new=${top.newRep}",
+            top.reps == 1 && top.newRep,
+        )
         assertEquals(1, top.reps)
-        assertTrue(top.newRep)
     }
 
-    private fun pose(kneeY: Float, hipY: Float, t: Long): PoseFrame {
+    private fun stand(t: Long) = frame(
+        hipX = 0.50f, hipY = 0.32f,
+        kneeX = 0.50f, kneeY = 0.56f,
+        ankleX = 0.50f, ankleY = 0.88f,
+        t = t,
+    )
+
+    private fun bottom(t: Long) = frame(
+        hipX = 0.50f, hipY = 0.48f,
+        kneeX = 0.50f, kneeY = 0.70f,
+        ankleX = 0.74f, ankleY = 0.70f,
+        t = t,
+    )
+
+    private fun frame(
+        hipX: Float,
+        hipY: Float,
+        kneeX: Float,
+        kneeY: Float,
+        ankleX: Float,
+        ankleY: Float,
+        t: Long,
+    ): PoseFrame {
         val points = MutableList(33) { Landmark(0.5f, 0.5f, visibility = 0.1f) }
         fun set(i: Int, x: Float, y: Float) {
             points[i] = Landmark(x, y, visibility = 0.95f)
         }
-        set(11, 0.50f, 0.18f)
-        set(12, 0.50f, 0.18f)
-        set(13, 0.58f, 0.28f)
-        set(14, 0.58f, 0.28f)
-        set(15, 0.62f, 0.36f)
-        set(16, 0.62f, 0.36f)
-        set(23, 0.50f, hipY)
-        set(24, 0.50f, hipY)
-        set(25, 0.52f, kneeY)
-        set(26, 0.52f, kneeY)
-        set(27, 0.50f, 0.88f)
-        set(28, 0.50f, 0.88f)
+        set(11, hipX, hipY - 0.16f)
+        set(12, hipX + 0.02f, hipY - 0.16f)
+        set(13, hipX + 0.05f, hipY - 0.06f)
+        set(14, hipX + 0.07f, hipY - 0.06f)
+        set(15, hipX + 0.07f, hipY + 0.02f)
+        set(16, hipX + 0.09f, hipY + 0.02f)
+        set(23, hipX, hipY)
+        set(24, hipX + 0.02f, hipY)
+        set(25, kneeX, kneeY)
+        set(26, kneeX + 0.02f, kneeY)
+        set(27, ankleX, ankleY)
+        set(28, ankleX + 0.02f, ankleY)
         return PoseFrame(points, 480, 640, t)
     }
 }
