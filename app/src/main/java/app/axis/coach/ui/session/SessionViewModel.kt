@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 
 data class SessionUiState(
     val exercise: Exercise,
-    val isFrontCamera: Boolean = true,
+    val isFrontCamera: Boolean = false,
     val isPaused: Boolean = false,
     val personDetected: Boolean = false,
     val landmarks: List<Landmark> = emptyList(),

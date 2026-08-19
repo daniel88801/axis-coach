@@ -57,7 +57,7 @@ class PoseDetector(
         }
     }
 
-    fun detect(imageProxy: ImageProxy, isFrontCamera: Boolean) {
+    fun detect(imageProxy: ImageProxy) {
         val marker = landmarker
         if (marker == null || closed.get()) {
             imageProxy.close()
@@ -68,9 +68,6 @@ class PoseDetector(
             val bitmap = imageProxy.toRgbaBitmap()
             val matrix = Matrix().apply {
                 postRotate(rotation.toFloat())
-                if (isFrontCamera) {
-                    postScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
-                }
             }
             val upright = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
             if (upright != bitmap) bitmap.recycle()

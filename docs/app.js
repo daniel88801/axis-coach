@@ -292,7 +292,7 @@ const state = {
   analyzer: null,
   started: 0,
   timer: null,
-  facing: "user",
+  facing: "environment",
   stream: null,
   landmarker: null,
   running: false,
@@ -557,6 +557,9 @@ async function startCamera() {
     audio: false,
   });
   const video = document.getElementById("cam");
+  const overlay = document.getElementById("overlay");
+  video.style.transform = "none";
+  overlay.style.transform = "none";
   video.srcObject = state.stream;
   await video.play();
 }

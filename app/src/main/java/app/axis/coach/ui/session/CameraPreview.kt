@@ -58,7 +58,7 @@ fun CameraPreview(
             .build()
             .also { useCase ->
                 useCase.setAnalyzer(detector.executor) { image ->
-                    detector.detect(image, isFront)
+                    detector.detect(image)
                 }
             }
         val selector = if (isFront) {
