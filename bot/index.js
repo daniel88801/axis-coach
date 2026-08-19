@@ -53,13 +53,7 @@ function publicSnapshot(board = loadBoard()) {
 }
 
 function appLink() {
-  const base = String(webAppUrl).split("#")[0].split("?")[0].replace(/\/?$/, "/");
-  const compact = {
-    v: 1,
-    ts: Date.now(),
-    u: publicSnapshot().users.slice(0, 15).map((u) => [u.id, nickOf(u), u.total, u.best, u.sets]),
-  };
-  return `${base}?lb=${encodeURIComponent(JSON.stringify(compact))}`;
+  return String(webAppUrl).split("#")[0].split("?")[0].replace(/\/?$/, "/");
 }
 
 function keyboard() {

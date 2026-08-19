@@ -27,7 +27,10 @@ function show(id) {
       b.classList.toggle("on", b.dataset.tab === id);
     });
   }
-  if (id === "leaders") renderLeaders();
+  if (id === "leaders") {
+    renderLeaders();
+    refreshLeaders();
+  }
   if (id === "history") renderHistory();
 }
 
@@ -442,11 +445,16 @@ function boardFromUrl() {
 }
 
 async function fetchPublicBoard() {
-  const url = new URL("leaders.json", document.baseURI);
-  url.searchParams.set("t", String(Date.now()));
-  const res = await fetch(url.href, { cache: "no-store" });
-  if (!res.ok) throw new Error("leaders.json");
-  return res.json();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 2500);
+  try {
+    const url = new URL("leaders.json", document.baseURI);
+    const res = await fetch(url.href, { signal: ctrl.signal });
+    if (!res.ok) throw new Error("leaders.json");
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function rankedUsers(board) {
@@ -503,14 +511,19 @@ function renderLeaders() {
   }).join("");
 }
 
+let leadersRefresh = null;
+
 async function refreshLeaders() {
-  const fromUrl = boardFromUrl();
-  if (fromUrl) ingestBoard(fromUrl, { preferIncoming: true });
-  seedLeadersFromHistory();
-  try {
-    ingestBoard(await fetchPublicBoard());
-  } catch { /* static snapshot optional */ }
-  renderLeaders();
+  if (leadersRefresh) return leadersRefresh;
+  leadersRefresh = (async () => {
+    seedLeadersFromHistory();
+    renderLeaders();
+    try {
+      ingestBoard(await fetchPublicBoard());
+      renderLeaders();
+    } catch { /* local table is enough */ }
+  })().finally(() => { leadersRefresh = null; });
+  return leadersRefresh;
 }
 
 function refreshHome() {
@@ -540,47 +553,53 @@ async function initPose() {
   const files = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm",
   );
-  state.landmarker = await PoseLandmarker.createFromOptions(files, {
-    baseOptions: {
-      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
-      delegate: "GPU",
-    },
+  const model = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+  const opts = (delegate) => ({
+    baseOptions: { modelAssetPath: model, delegate },
     runningMode: "VIDEO",
     numPoses: 1,
   });
+  try {
+    state.landmarker = await PoseLandmarker.createFromOptions(files, opts("GPU"));
+  } catch {
+    state.landmarker = await PoseLandmarker.createFromOptions(files, opts("CPU"));
+  }
+}
+
+async function openCameraStream() {
+  const facing = state.facing === "user" ? "user" : "environment";
+  const tries = [
+    { video: { facingMode: { exact: facing } }, audio: false },
+    { video: { facingMode: { ideal: facing } }, audio: false },
+    { video: { facingMode: facing }, audio: false },
+    { video: true, audio: false },
+  ];
+  let lastErr;
+  for (const constraints of tries) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error("camera");
 }
 
 async function startCamera() {
   if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
-  const facing = state.facing === "user" ? "user" : "environment";
-  try {
-    state.stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: facing },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        resizeMode: "none",
-      },
-      audio: false,
-    });
-  } catch {
-    state.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: facing } },
-      audio: false,
-    });
-  }
+  state.stream = await openCameraStream();
   const track = state.stream.getVideoTracks()[0];
   try {
     const caps = track.getCapabilities?.() || {};
-    if (caps.zoom) {
-      const minZoom = typeof caps.zoom.min === "number" ? caps.zoom.min : 1;
-      await track.applyConstraints({ advanced: [{ zoom: minZoom }] });
+    if (caps.zoom && typeof caps.zoom.min === "number") {
+      await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
     }
   } catch { /* zoom not supported */ }
   const video = document.getElementById("cam");
-  const overlay = document.getElementById("overlay");
-  video.style.transform = "none";
-  overlay.style.transform = "none";
+  video.setAttribute("playsinline", "true");
+  video.setAttribute("webkit-playsinline", "true");
+  video.muted = true;
+  video.playsInline = true;
   video.srcObject = state.stream;
   await video.play();
 }
@@ -650,7 +669,6 @@ async function openSession(ex) {
   document.getElementById("formScore").textContent = "100";
   show("session");
   try {
-    await initPose();
     await startCamera();
     state.running = true;
     loop();
@@ -658,6 +676,12 @@ async function openSession(ex) {
     state.timer = setInterval(tickClock, 250);
   } catch (err) {
     document.getElementById("cue").textContent = "Нужен доступ к камере";
+    return;
+  }
+  try {
+    await initPose();
+  } catch (err) {
+    document.getElementById("cue").textContent = "Камера есть, модель позы не загрузилась";
   }
 }
 
@@ -782,5 +806,11 @@ document.getElementById("dock").querySelectorAll("[data-tab]").forEach((btn) => 
 });
 
 refreshHome();
-refreshLeaders();
+seedLeadersFromHistory();
+try {
+  const fromUrl = boardFromUrl();
+  if (fromUrl) ingestBoard(fromUrl, { preferIncoming: true });
+} catch { /* ignore bad url */ }
+renderLeaders();
 setTimeout(() => show("home"), 1800);
+refreshLeaders();
