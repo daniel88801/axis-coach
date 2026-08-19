@@ -7,38 +7,39 @@ import app.axis.coach.domain.model.PoseFrame
 import app.axis.coach.pose.LandmarkIndex
 
 class PushUpAnalyzer : ExerciseAnalyzer {
-    private val machine = RepMachine(topAngle = 155f, bottomAngle = 95f)
+    private val tracker = PushUpTracker()
     private var rollingScore = 80f
 
     override fun analyze(frame: PoseFrame): FrameVerdict {
+        val counted = tracker.onFrame(frame)
+        val feat = tracker.lastFeat
         val side = frame.pickSide()
-        if (side == null || side.visibility < 0.45f) {
-            return notDetected().copy(reps = machine.reps, formScore = rollingScore.toInt())
-        }
 
-        val elbowAngle = Geometry.angle(side.shoulder, side.elbow, side.wrist)
-        val alignment = Geometry.deviationFromStraight(side.shoulder, side.hip, side.ankle)
-        val counted = machine.onAngle(elbowAngle, frame.timestampMs)
+        if (feat == null || side == null || side.visibility < 0.35f) {
+            return notDetected().copy(reps = tracker.reps, formScore = rollingScore.toInt())
+        }
 
         val highlights = mutableSetOf<Int>()
         var cue: String? = null
         var severity = CueSeverity.NONE
         var penalty = 0
 
-        if (alignment > 22f) {
+        if (!feat.wristBelow) {
+            cue = "Упор лёжа — ладони ниже плеч"
+            severity = CueSeverity.WARN
+            penalty += 10
+        }
+
+        if (feat.align > 22f) {
             val hipsHigh = side.hip.y < (side.shoulder.y + side.ankle.y) / 2f
-            if (hipsHigh) {
-                cue = Cues.HIPS_DOWN
-            } else {
-                cue = Cues.HIPS_UP
-            }
+            cue = if (hipsHigh) Cues.HIPS_DOWN else Cues.HIPS_UP
             severity = CueSeverity.COACH
             penalty += 18
             highlights += LandmarkIndex.LEFT_HIP
             highlights += LandmarkIndex.RIGHT_HIP
         }
 
-        if (machine.phase == MovementPhase.BOTTOM && elbowAngle > 105f) {
+        if (tracker.phase == MovementPhase.BOTTOM && feat.elbow > 105f) {
             cue = Cues.LOWER
             severity = CueSeverity.COACH
             penalty += 12
@@ -46,7 +47,7 @@ class PushUpAnalyzer : ExerciseAnalyzer {
             highlights += LandmarkIndex.RIGHT_ELBOW
         }
 
-        if (machine.phase == MovementPhase.ASCENDING && machine.lastDepth > 115f) {
+        if (tracker.phase == MovementPhase.ASCENDING && tracker.lastDepth > 115f) {
             cue = Cues.LOWER
             severity = CueSeverity.COACH
             penalty += 14
@@ -57,12 +58,12 @@ class PushUpAnalyzer : ExerciseAnalyzer {
             severity = CueSeverity.GOOD
         }
 
-        val instant = Geometry.clampScore(100 - penalty - (alignment / 2f).toInt())
+        val instant = Geometry.clampScore(100 - penalty - (feat.align / 2f).toInt())
         rollingScore = Geometry.lerp(rollingScore, instant.toFloat(), 0.18f)
 
         return FrameVerdict(
-            phase = machine.phase,
-            reps = machine.reps,
+            phase = tracker.phase,
+            reps = tracker.reps,
             holdMillis = 0,
             formScore = rollingScore.toInt(),
             cue = cue,
@@ -70,13 +71,13 @@ class PushUpAnalyzer : ExerciseAnalyzer {
             highlightedJoints = highlights,
             newRep = counted,
             personDetected = true,
-            elbowAngle = elbowAngle,
-            alignmentError = alignment,
+            elbowAngle = feat.elbow,
+            alignmentError = feat.align,
         )
     }
 
     override fun reset() {
-        machine.reset()
+        tracker.reset()
         rollingScore = 80f
     }
 }

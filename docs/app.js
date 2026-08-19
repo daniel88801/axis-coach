@@ -50,6 +50,19 @@ function pickSide(lm) {
   return s;
 }
 
+function visOf(p) { return p?.visibility ?? 0; }
+
+function mid2(a, b) {
+  if (!a && !b) return null;
+  if (!a) return b;
+  if (!b) return a;
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, visibility: Math.min(visOf(a), visOf(b)) };
+}
+
+function ema(prev, next, a) {
+  return prev == null ? next : prev + a * (next - prev);
+}
+
 class RepMachine {
   constructor(top, bottom) {
     this.top = top; this.bottom = bottom;
@@ -70,10 +83,147 @@ class RepMachine {
   reset() { this.phase = "idle"; this.reps = 0; this.reached = false; this.last = 0; this.lowest = 180; }
 }
 
+/** Counts a push-up only after a real descent (elbows + shoulders) and a full lockout. */
+class PushUpCounter {
+  constructor() {
+    this.reps = 0;
+    this.phase = "idle";
+    this.elbow = null;
+    this.depth = null;
+    this.topDepth = null;
+    this.reached = false;
+    this.last = 0;
+    this.lowest = 180;
+    this.highest = 0;
+    this.maxDrop = 0;
+    this.downAt = 0;
+    this.seenTop = false;
+    this.warm = 0;
+    this.lastFeat = null;
+  }
+
+  reset() {
+    this.reps = 0;
+    this.phase = "idle";
+    this.elbow = null;
+    this.depth = null;
+    this.topDepth = null;
+    this.reached = false;
+    this.last = 0;
+    this.lowest = 180;
+    this.highest = 0;
+    this.maxDrop = 0;
+    this.downAt = 0;
+    this.seenTop = false;
+    this.warm = 0;
+    this.lastFeat = null;
+  }
+
+  measure(lm) {
+    const ls = lm[L.LS], rs = lm[L.RS], le = lm[L.LE], re = lm[L.RE];
+    const lw = lm[L.LW], rw = lm[L.RW], lh = lm[L.LH], rh = lm[L.RH];
+    const la = lm[L.LA], ra = lm[L.RA];
+    if (!ls || !rs || !lh || !rh) return null;
+
+    const arms = [];
+    const leftVis = (visOf(ls) + visOf(le) + visOf(lw)) / 3;
+    const rightVis = (visOf(rs) + visOf(re) + visOf(rw)) / 3;
+    if (ls && le && lw && leftVis >= 0.28) arms.push({ ang: angle(ls, le, lw), vis: leftVis });
+    if (rs && re && rw && rightVis >= 0.28) arms.push({ ang: angle(rs, re, rw), vis: rightVis });
+    if (!arms.length) return null;
+
+    let elbow;
+    if (arms.length === 2 && Math.abs(arms[0].ang - arms[1].ang) < 55) {
+      const w = arms[0].vis + arms[1].vis;
+      elbow = (arms[0].ang * arms[0].vis + arms[1].ang * arms[1].vis) / w;
+    } else {
+      elbow = arms.sort((a, b) => b.vis - a.vis)[0].ang;
+    }
+
+    const sh = mid2(ls, rs);
+    const wr = mid2(lw, rw);
+    const hp = mid2(lh, rh);
+    const an = mid2(la, ra);
+    if (!sh || !wr || !hp) return null;
+
+    const torso = Math.max(0.08, Math.hypot(sh.x - hp.x, sh.y - hp.y));
+    const front = Math.abs(ls.x - rs.x) > 0.14;
+    const wristBelow = wr.y + 0.02 >= sh.y;
+    const align = an ? 180 - angle(sh, hp, an) : 0;
+    const bodyVis = (visOf(ls) + visOf(rs) + visOf(lh) + visOf(rh)) / 4;
+    if (bodyVis < 0.35) return null;
+
+    return { elbow, depth: sh.y, torso, front, wristBelow, align, ok: wristBelow };
+  }
+
+  onFrame(lm, now) {
+    const f = this.measure(lm);
+    this.lastFeat = f;
+    if (!f || !f.ok) return false;
+
+    this.elbow = ema(this.elbow, f.elbow, 0.30);
+    this.depth = ema(this.depth, f.depth, 0.26);
+    if (this.warm < 8) {
+      this.warm += 1;
+      if (this.elbow >= 148) this.topDepth = this.topDepth == null ? this.depth : Math.min(this.topDepth, this.depth);
+      return false;
+    }
+
+    const elbow = this.elbow;
+    const depth = this.depth;
+    this.lowest = Math.min(this.lowest, elbow);
+    this.highest = Math.max(this.highest, elbow);
+
+    if (elbow >= 148) {
+      this.topDepth = this.topDepth == null ? depth : Math.min(this.topDepth, depth);
+      this.seenTop = true;
+    }
+    const drop = this.topDepth == null ? 0 : depth - this.topDepth;
+    this.maxDrop = Math.max(this.maxDrop, drop);
+    const minDrop = Math.max(0.042, Math.min(0.16, f.torso * 0.24));
+
+    const atBottom = f.front
+      ? (drop >= minDrop && elbow <= 150) || elbow <= 122
+      : elbow <= 98 || (drop >= minDrop && elbow <= 118);
+    const atTop = f.front
+      ? elbow >= 140 && drop <= minDrop * 0.42
+      : elbow >= 152;
+
+    let counted = false;
+    if (atTop) {
+      const sinceLast = this.last ? now - this.last : 1e9;
+      const cycle = this.downAt ? now - this.downAt : 0;
+      const rom = this.highest - this.lowest;
+      const deepEnough = this.maxDrop >= minDrop || rom >= (f.front ? 24 : 38);
+      const timeOk = sinceLast >= 400 && (!this.downAt || (cycle >= 220 && cycle <= 4200));
+      if (this.reached && this.seenTop && deepEnough && timeOk) {
+        this.reps += 1;
+        this.last = now;
+        counted = true;
+      }
+      this.reached = false;
+      this.lowest = elbow;
+      this.highest = elbow;
+      this.maxDrop = drop;
+      this.downAt = 0;
+      this.phase = "top";
+    } else if (atBottom) {
+      if (!this.reached) this.downAt = now;
+      this.reached = true;
+      this.phase = "bottom";
+    } else if (this.phase === "top" || this.phase === "idle") {
+      this.phase = "down";
+    } else if (this.phase === "bottom") {
+      this.phase = "up";
+    }
+    return counted;
+  }
+}
+
 class Analyzer {
   constructor(kind) {
     this.kind = kind;
-    this.machine = new RepMachine(kind === "push_up" ? 155 : 158, kind === "push_up" ? 95 : 100);
+    this.machine = kind === "push_up" ? new PushUpCounter() : new RepMachine(158, 100);
     this.score = 80;
     this.hold = 0;
     this.lastT = null;
@@ -103,10 +253,19 @@ class Analyzer {
       if (this.machine.phase === "up" && this.machine.lowest > 118) { cue = "Чуть глубже"; penalty = 16; color = "var(--amber)"; }
       if (counted && !cue) { cue = "Чисто"; color = "var(--lime)"; }
     } else {
-      const elbow = angle(side.s, side.e, side.w);
-      const align = 180 - angle(side.s, side.h, side.a);
-      counted = this.machine.onAngle(elbow, now);
+      counted = this.machine.onFrame(lm, now);
+      const feat = this.machine.lastFeat;
+      if (!feat) {
+        return { person: false, reps: this.machine.reps, hold: this.hold, score: Math.round(this.score), cue: "Руки и плечи в кадре", color: "var(--amber)", newRep: false };
+      }
+      if (!feat.ok) {
+        cue = "Упор лёжа — ладони ниже плеч";
+        color = "var(--amber)";
+        penalty = 10;
+      }
+      const align = feat.align;
       if (align > 22) { cue = side.h.y < (side.s.y + side.a.y) / 2 ? "Таз ниже — не поднимай" : "Таз выше — одна линия"; penalty = 18; color = "var(--amber)"; }
+      if (this.machine.phase === "up" && this.machine.lowest > 118) { cue = "Ниже грудь"; penalty = 14; color = "var(--amber)"; }
       if (counted && !cue) { cue = "Чисто"; color = "var(--lime)"; }
     }
     if (cue && color !== "var(--lime)") this.cues[cue] = (this.cues[cue] || 0) + 1;
