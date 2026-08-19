@@ -3,7 +3,11 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/leaders.json"
   pull_request:
+    paths-ignore:
+      - "docs/leaders.json"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}

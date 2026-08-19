@@ -17,6 +17,8 @@ const EX = {
 const L = { LS: 11, RS: 12, LE: 13, RE: 14, LW: 15, RW: 16, LH: 23, RH: 24, LK: 25, RK: 26, LA: 27, RA: 28 };
 const CONN = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12]];
 
+let leadersPoll = null;
+
 function show(id) {
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("on", v.id === id));
   const dock = document.getElementById("dock");
@@ -27,9 +29,14 @@ function show(id) {
       b.classList.toggle("on", b.dataset.tab === id);
     });
   }
+  if (leadersPoll) {
+    clearInterval(leadersPoll);
+    leadersPoll = null;
+  }
   if (id === "leaders") {
     renderLeaders();
     refreshLeaders();
+    leadersPoll = setInterval(() => refreshLeaders(), 8000);
   }
   if (id === "history") renderHistory();
 }
@@ -372,7 +379,7 @@ function normalizeBoard(raw) {
 
 function ingestBoard(raw, { preferIncoming = false } = {}) {
   const incoming = normalizeBoard(raw);
-  if (!incoming) return loadLeaders();
+  if (!incoming || !incoming.users.length) return loadLeaders();
   const local = loadLeaders();
   const byId = new Map();
   for (const u of local.users) byId.set(String(u.id), { ...u });
@@ -453,17 +460,26 @@ function boardFromUrl() {
   }
 }
 
-async function fetchPublicBoard() {
+async function fetchOneBoard(href) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 2500);
+  const timer = setTimeout(() => ctrl.abort(), 4000);
   try {
-    const url = new URL("leaders.json", document.baseURI);
-    const res = await fetch(url.href, { signal: ctrl.signal });
+    const res = await fetch(href, { signal: ctrl.signal, cache: "no-store" });
     if (!res.ok) throw new Error("leaders.json");
     return await res.json();
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchPublicBoards() {
+  const t = Date.now();
+  const urls = [
+    `https://raw.githubusercontent.com/daniel88801/axis-coach/main/docs/leaders.json?t=${t}`,
+    `https://daniel88801.github.io/axis-coach/leaders.json?t=${t}`,
+  ];
+  const results = await Promise.allSettled(urls.map(fetchOneBoard));
+  return results.filter((r) => r.status === "fulfilled").map((r) => r.value);
 }
 
 function rankedUsers(board) {
@@ -528,7 +544,8 @@ async function refreshLeaders() {
     seedLeadersFromHistory();
     renderLeaders();
     try {
-      ingestBoard(await fetchPublicBoard());
+      const boards = await fetchPublicBoards();
+      for (const board of boards) ingestBoard(board);
       renderLeaders();
     } catch { /* local table is enough */ }
   })().finally(() => { leadersRefresh = null; });
@@ -589,7 +606,8 @@ function releaseCamera() {
 }
 
 function syncMirror() {
-  /* Do not CSS-flip <video> in Telegram: WebView often paints a black frame. */
+  const feed = document.getElementById("stageFeed");
+  if (feed) feed.classList.toggle("mirror", state.facing === "user");
 }
 
 async function openCameraStream() {
@@ -833,6 +851,7 @@ function endSet() {
   if (rec.exercise === "push_up" && rec.reps > 0) applyMyPushups(rec.reps);
   showLeadersCta(rec);
   show("recap");
+  refreshLeaders();
 }
 
 document.querySelectorAll("[data-ex]").forEach((el) => {

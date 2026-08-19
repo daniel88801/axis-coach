@@ -1,7 +1,13 @@
+import { execFile } from "node:child_process";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import TelegramBot from "node-telegram-bot-api";
+
+const execFileAsync = promisify(execFile);
+const GH_REPO = "daniel88801/axis-coach";
+const GH_LEADERS_PATH = "docs/leaders.json";
 
 try {
   for (const line of readFileSync(new URL("./.env", import.meta.url), "utf8").split("\n")) {
@@ -126,6 +132,36 @@ function saveBoard(board) {
     renameSync(pub, PUBLIC_FILE);
   } catch (err) {
     console.error("leaders.json", err.message);
+  }
+  publishLeadersRemote(board);
+}
+
+async function publishLeadersRemote(board) {
+  const snapshot = JSON.stringify(publicSnapshot(board));
+  const payloadPath = fileURLToPath(new URL("./data/gh-leaders-put.json", import.meta.url));
+  try {
+    mkdirSync(dirname(payloadPath), { recursive: true });
+    let sha;
+    try {
+      const { stdout } = await execFileAsync("gh", ["api", `repos/${GH_REPO}/contents/${GH_LEADERS_PATH}`], {
+        timeout: 20000,
+        windowsHide: true,
+      });
+      sha = JSON.parse(stdout).sha;
+    } catch { /* file may be missing */ }
+    const payload = {
+      message: "Обновить таблицу лидеров",
+      content: Buffer.from(snapshot).toString("base64"),
+    };
+    if (sha) payload.sha = sha;
+    writeFileSync(payloadPath, JSON.stringify(payload));
+    await execFileAsync(
+      "gh",
+      ["api", "-X", "PUT", `repos/${GH_REPO}/contents/${GH_LEADERS_PATH}`, "--input", payloadPath],
+      { timeout: 25000, windowsHide: true },
+    );
+  } catch (err) {
+    console.error("publish leaders", err.stderr || err.message);
   }
 }
 
