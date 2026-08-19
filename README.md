@@ -54,6 +54,17 @@ npm start
 
 Then open the bot and tap **Open AXIS**.
 
+## CI / CD
+
+GitHub Actions runs on every push and pull request:
+
+- **CI** — Android unit tests + debug APK, syntax check for the Mini App and Telegram bot
+- **Deploy Mini App** — publishes `docs/` to GitHub Pages (`https://daniel88801.github.io/axis-coach/`)
+
+The APK is uploaded as a workflow artifact (`axis-debug`).
+
+For Pages deploys from Actions, set **Settings → Pages → Source** to **GitHub Actions**.
+
 ## Why this is a portfolio app
 
 Recruiters get three things in one APK: modern Compose, a real CameraX/ML pipeline, and domain logic you can read without Android (the analyzers are plain Kotlin + tests). The UI is a custom dark athletic system, not a default purple scaffold.
