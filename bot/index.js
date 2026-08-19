@@ -80,7 +80,8 @@ function inline() {
   return {
     inline_keyboard: [
       [{ text: "Открыть AXIS", web_app: { url: appLink() } }],
-      [{ text: "Таблица лидеров", callback_data: "leaders" }, { text: "Поединок", callback_data: "fight" }],
+      [{ text: "Таблица лидеров", callback_data: "leaders" }],
+      [{ text: "Поединок в чат", switch_inline_query: "поединок" }],
     ],
   };
 }
@@ -308,8 +309,8 @@ function markupFor(chat) {
   if (isGroupChat(chat)) {
     return {
       inline_keyboard: [
+        [{ text: "Поединок", switch_inline_query_current_chat: "поединок" }],
         [{ text: "Открыть AXIS", url: `https://t.me/${botUsername}` }],
-        [{ text: "Поединок: /fight @ник", callback_data: "fight" }],
       ],
     };
   }
@@ -320,9 +321,9 @@ function groupWelcome() {
   return [
     "AXIS в чате. Можно устроить поединок по отжиманиям.",
     "",
-    "Команда:",
-    "/fight @ник — вызвать человека",
-    "или ответь на его сообщение командой /fight",
+    "В чате напиши:",
+    `@${botUsername} — и отправь поединок`,
+    "или /fight @ник / ответь /fight на сообщение",
     "",
     "Оба делают один сет в личке с ботом. Победитель пишется сюда.",
   ].join("\n");
@@ -396,6 +397,14 @@ async function announceFight(fight, text) {
   const open = {
     inline_keyboard: [[{ text: "Открыть AXIS в личке", url: `https://t.me/${botUsername}` }]],
   };
+  if (fight.inlineMessageId) {
+    try {
+      await bot.editMessageText(text, {
+        inline_message_id: fight.inlineMessageId,
+        reply_markup: open,
+      });
+    } catch { /* ignore */ }
+  }
   if (fight.groupId) {
     try {
       await bot.sendMessage(fight.groupId, text, { reply_markup: open });
@@ -418,16 +427,14 @@ async function promptFight(chat, chatId) {
       ? [
           "Поединок 1 на 1 — кто сделает больше отжиманий за один сет.",
           "",
-          "Напиши /fight @ник",
-          "или ответь на сообщение соперника командой /fight",
+          `Напиши @${botUsername} и выбери «Поединок по отжиманиям».`,
+          "Или /fight @ник — или ответь /fight на сообщение.",
         ].join("\n")
       : [
           "Поединок 1 на 1 — кто сделает больше отжиманий за один сет.",
           "",
-          "Нажми «Поединок» внизу и выбери друга.",
-          "Или отправь: /fight @ник",
-          "",
-          `Добавить бота в чат: ${addToGroupLink()}`,
+          `В любом чате напиши @${botUsername} и отправь поединок.`,
+          "Или нажми «Поединок в чат» / «Поединок» внизу.",
         ].join("\n"),
     { reply_markup: markupFor(chat) },
   );
@@ -797,8 +804,8 @@ bot.onText(/\/help\b|\/помощь\b/, async (msg) => {
       "5. После отжиманий нажми «Отправить боту»",
       "",
       "Поединок 1 на 1:",
-      "В личке: кнопка «Поединок» или /fight @ник",
-      "В чате: добавь бота, затем /fight @ник или ответь /fight на сообщение",
+      `В любом чате напиши @${botUsername} и отправь поединок.`,
+      "Или /fight @ник, или ответь /fight на сообщение.",
       "",
       `Добавить в чат: ${addToGroupLink()}`,
       "",
@@ -827,14 +834,20 @@ bot.on("callback_query", async (q) => {
       await promptFight(q.message.chat, q.message.chat.id);
       return;
     }
+    if (data.startsWith("fight_in:")) {
+      await acceptInlineFight(q, data.slice(9));
+      return;
+    }
     if (data.startsWith("fight_ok:")) {
       await bot.answerCallbackQuery(q.id);
-      await acceptFight(q.from, q.message.chat.id, data.slice(9));
+      const chatId = q.message?.chat?.id || q.from.id;
+      await acceptFight(q.from, chatId, data.slice(9));
       return;
     }
     if (data.startsWith("fight_no:")) {
       await bot.answerCallbackQuery(q.id);
-      await declineFight(q.from, q.message.chat.id, data.slice(9));
+      const chatId = q.message?.chat?.id || q.from.id;
+      await declineFight(q.from, chatId, data.slice(9));
     }
   } catch (err) {
     console.error("callback", err.message);
@@ -881,6 +894,84 @@ bot.on("message", async (msg) => {
     { reply_markup: inline() },
   );
 });
+
+bot.on("inline_query", async (q) => {
+  try {
+    const name = displayName(q.from) || "Атлет";
+    await bot.answerInlineQuery(q.id, [
+      {
+        type: "article",
+        id: `f${q.from.id}${Date.now()}`.slice(0, 64),
+        title: "Поединок по отжиманиям",
+        description: "Отправь в чат — соперник нажмёт «Принять»",
+        thumbnail_url: "https://daniel88801.github.io/axis-coach/app_icon.png",
+        input_message_content: {
+          message_text: [
+            `${name} вызывает на поединок по отжиманиям.`,
+            "Один сет. Кто больше — тот выиграл.",
+            "Нажми «Принять», потом открой AXIS в личке и отправь сет боту.",
+          ].join("\n"),
+        },
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "Принять вызов", callback_data: `fight_in:${q.from.id}` }],
+            [{ text: "Открыть AXIS", url: `https://t.me/${botUsername}` }],
+          ],
+        },
+      },
+    ], {
+      cache_time: 0,
+      is_personal: true,
+    });
+  } catch (err) {
+    console.error("inline_query", err.message);
+  }
+});
+
+async function acceptInlineFight(q, challengerIdRaw) {
+  const challengerId = Number(challengerIdRaw);
+  if (!challengerId || String(q.from.id) === String(challengerId)) {
+    await bot.answerCallbackQuery(q.id, { text: "Это твой вызов — пусть примет соперник", show_alert: true });
+    return;
+  }
+  if (findFightByUser(q.from.id)) {
+    await bot.answerCallbackQuery(q.id, { text: "Сначала закончи текущий поединок: /cancel", show_alert: true });
+    return;
+  }
+  if (findFightByUser(challengerId)) {
+    await bot.answerCallbackQuery(q.id, { text: "Соперник уже в другом поединке", show_alert: true });
+    return;
+  }
+  let challenger = { id: challengerId, first_name: "Соперник" };
+  try {
+    const chat = await bot.getChat(challengerId);
+    challenger = {
+      id: chat.id,
+      first_name: chat.first_name || "Соперник",
+      last_name: chat.last_name,
+      username: chat.username,
+    };
+  } catch { /* only id known */ }
+
+  const fight = {
+    id: newFightId(),
+    status: "active",
+    created: Date.now(),
+    inlineMessageId: q.inline_message_id || null,
+    groupId: q.message?.chat?.id || null,
+    a: playerFromUser(challenger, { chatId: challengerId }),
+    b: playerFromUser(q.from, { chatId: q.from.id }),
+  };
+  upsertFight(fight);
+  await bot.answerCallbackQuery(q.id, { text: "Поединок начался!" });
+  const go = [
+    "Поединок начался!",
+    formatFight(fight),
+    "",
+    "Открой AXIS в личке, сделай сет отжиманий и отправь результат боту.",
+  ].join("\n");
+  await announceFight(fight, go);
+}
 
 bot.on("my_chat_member", async (upd) => {
   try {
