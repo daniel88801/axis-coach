@@ -253,8 +253,8 @@ function formatBoard(board, userId) {
   return lines.join("\n");
 }
 
-async function sendLeaderboard(chatId, from) {
-  await bot.sendMessage(chatId, formatBoard(loadBoard(), from?.id), { reply_markup: keyboard() });
+async function sendLeaderboard(chat, from) {
+  await bot.sendMessage(chat.id, formatBoard(loadBoard(), from?.id), { reply_markup: markupFor(chat) });
 }
 
 function emptyFights() {
@@ -294,6 +294,38 @@ function playerFromUser(user, extra = {}) {
 
 function fightLink(id) {
   return `https://t.me/${botUsername}?start=fight_${id}`;
+}
+
+function addToGroupLink() {
+  return `https://t.me/${botUsername}?startgroup=fight`;
+}
+
+function isGroupChat(chat) {
+  return chat?.type === "group" || chat?.type === "supergroup";
+}
+
+function markupFor(chat) {
+  if (isGroupChat(chat)) {
+    return {
+      inline_keyboard: [
+        [{ text: "Открыть AXIS", url: `https://t.me/${botUsername}` }],
+        [{ text: "Поединок: /fight @ник", callback_data: "fight" }],
+      ],
+    };
+  }
+  return keyboard();
+}
+
+function groupWelcome() {
+  return [
+    "AXIS в чате. Можно устроить поединок по отжиманиям.",
+    "",
+    "Команда:",
+    "/fight @ник — вызвать человека",
+    "или ответь на его сообщение командой /fight",
+    "",
+    "Оба делают один сет в личке с ботом. Победитель пишется сюда.",
+  ].join("\n");
 }
 
 function findFightByUser(userId) {
@@ -351,7 +383,7 @@ function formatFight(fight) {
 function fightKeyboard(id) {
   return {
     inline_keyboard: [
-      [{ text: "Открыть AXIS", web_app: { url: appLink() } }],
+      [{ text: "Открыть AXIS", url: `https://t.me/${botUsername}` }],
       [
         { text: "Принять", callback_data: `fight_ok:${id}` },
         { text: "Отклонить", callback_data: `fight_no:${id}` },
@@ -360,22 +392,52 @@ function fightKeyboard(id) {
   };
 }
 
-async function promptFight(chatId) {
+async function announceFight(fight, text) {
+  const open = {
+    inline_keyboard: [[{ text: "Открыть AXIS в личке", url: `https://t.me/${botUsername}` }]],
+  };
+  if (fight.groupId) {
+    try {
+      await bot.sendMessage(fight.groupId, text, { reply_markup: open });
+    } catch { /* ignore */ }
+  }
+  for (const p of [fight.a, fight.b]) {
+    const id = p.chatId || p.id;
+    if (!id || id === fight.groupId) continue;
+    try {
+      await bot.sendMessage(id, text, { reply_markup: inline() });
+    } catch { /* user hasn't started the bot */ }
+  }
+}
+
+async function promptFight(chat, chatId) {
+  const group = isGroupChat(chat);
   await bot.sendMessage(
     chatId,
-    [
-      "Поединок 1 на 1 — кто сделает больше отжиманий за один сет.",
-      "",
-      "Нажми «Поединок» внизу и выбери друга.",
-      "Или отправь: /fight @ник",
-    ].join("\n"),
-    { reply_markup: keyboard() },
+    group
+      ? [
+          "Поединок 1 на 1 — кто сделает больше отжиманий за один сет.",
+          "",
+          "Напиши /fight @ник",
+          "или ответь на сообщение соперника командой /fight",
+        ].join("\n")
+      : [
+          "Поединок 1 на 1 — кто сделает больше отжиманий за один сет.",
+          "",
+          "Нажми «Поединок» внизу и выбери друга.",
+          "Или отправь: /fight @ник",
+          "",
+          `Добавить бота в чат: ${addToGroupLink()}`,
+        ].join("\n"),
+    { reply_markup: markupFor(chat) },
   );
 }
 
-async function startFight(from, fromChatId, opponent) {
+async function startFight(from, fromChat, opponent) {
+  const fromChatId = fromChat.id;
+  const groupId = isGroupChat(fromChat) ? fromChat.id : null;
   if (String(from.id) === String(opponent.id)) {
-    await bot.sendMessage(fromChatId, "С самим собой сражаться нельзя.", { reply_markup: keyboard() });
+    await bot.sendMessage(fromChatId, "С самим собой сражаться нельзя.", { reply_markup: markupFor(fromChat) });
     return;
   }
   const existing = findFightByUser(from.id);
@@ -383,13 +445,13 @@ async function startFight(from, fromChatId, opponent) {
     await bot.sendMessage(
       fromChatId,
       `У тебя уже есть поединок.\n\n${formatFight(existing)}\n\nОтмена: /cancel`,
-      { reply_markup: keyboard() },
+      { reply_markup: markupFor(fromChat) },
     );
     return;
   }
   const other = findFightByUser(opponent.id);
   if (other) {
-    await bot.sendMessage(fromChatId, `${opponent.name} уже в другом поединке.`, { reply_markup: keyboard() });
+    await bot.sendMessage(fromChatId, `${opponent.name} уже в другом поединке.`, { reply_markup: markupFor(fromChat) });
     return;
   }
 
@@ -397,7 +459,8 @@ async function startFight(from, fromChatId, opponent) {
     id: newFightId(),
     status: "pending",
     created: Date.now(),
-    a: playerFromUser(from, { chatId: fromChatId }),
+    groupId,
+    a: playerFromUser(from, { chatId: from.id }),
     b: {
       id: opponent.id,
       name: opponent.name,
@@ -410,32 +473,32 @@ async function startFight(from, fromChatId, opponent) {
   upsertFight(fight);
 
   const link = fightLink(fight.id);
-  await bot.sendMessage(
-    fromChatId,
-    [
-      `Вызов ушёл: ${fight.b.name}`,
-      "Кто сделает больше отжиманий за один сет — тот победил.",
-      "",
-      `Если соперник не получил сообщение, перешли ссылку:\n${link}`,
-    ].join("\n"),
-    { reply_markup: keyboard() },
-  );
+  const invite = [
+    `${fight.a.name} вызывает ${fight.b.name} на поединок по отжиманиям.`,
+    "Один сет. Кто больше — тот выиграл.",
+    "",
+    `${fight.b.name}, нажми «Принять» или открой: ${link}`,
+  ].join("\n");
 
-  try {
-    await bot.sendMessage(
-      fight.b.chatId,
-      [
-        `${fight.a.name} вызывает тебя на поединок по отжиманиям.`,
-        "Один сет. Кто больше — тот выиграл.",
-      ].join("\n"),
-      { reply_markup: fightKeyboard(fight.id) },
-    );
-  } catch {
-    await bot.sendMessage(
-      fromChatId,
-      `Не могу написать ${fight.b.name} — пусть сначала откроет бота по ссылке:\n${link}`,
-      { reply_markup: keyboard() },
-    );
+  await bot.sendMessage(fromChatId, invite, { reply_markup: fightKeyboard(fight.id) });
+
+  if (!groupId) {
+    try {
+      await bot.sendMessage(
+        fight.b.chatId,
+        [
+          `${fight.a.name} вызывает тебя на поединок по отжиманиям.`,
+          "Один сет. Кто больше — тот выиграл.",
+        ].join("\n"),
+        { reply_markup: fightKeyboard(fight.id) },
+      );
+    } catch {
+      await bot.sendMessage(
+        fromChatId,
+        `Не могу написать ${fight.b.name} в личку — пусть откроет бота:\n${link}`,
+        { reply_markup: markupFor(fromChat) },
+      );
+    }
   }
 }
 
@@ -467,21 +530,20 @@ async function acceptFight(user, chatId, fightId) {
   }
 
   fight.status = "active";
-  fight.b.chatId = chatId;
+  fight.b.chatId = user.id;
   fight.b.name = nickOf({ name: displayName(user), username: user.username });
   fight.b.username = user.username || fight.b.username;
+  if (chatId !== user.id) fight.groupId = fight.groupId || chatId;
   upsertFight(fight);
 
   const go = [
     "Поединок начался!",
     formatFight(fight),
     "",
-    "Открой AXIS, сделай сет отжиманий и отправь результат боту.",
+    "Открой бота в личке, сделай сет отжиманий в AXIS и отправь результат.",
+    "Итог придёт сюда.",
   ].join("\n");
-  await bot.sendMessage(chatId, go, { reply_markup: inline() });
-  try {
-    await bot.sendMessage(fight.a.chatId, go, { reply_markup: inline() });
-  } catch { /* challenger chat may be unavailable */ }
+  await announceFight(fight, go);
 }
 
 async function declineFight(user, chatId, fightId) {
@@ -495,14 +557,12 @@ async function declineFight(user, chatId, fightId) {
     return;
   }
   fight.status = "declined";
+  if (chatId !== user.id) fight.groupId = fight.groupId || chatId;
   upsertFight(fight);
-  await bot.sendMessage(chatId, "Поединок отменён.", { reply_markup: keyboard() });
-  const other = opponentOf(fight, user.id);
-  if (other) {
-    try {
-      await bot.sendMessage(other.chatId, `${nickOf({ name: displayName(user), username: user.username })} отменил поединок.`, { reply_markup: keyboard() });
-    } catch { /* ignore */ }
-  }
+  await announceFight(
+    fight,
+    `${nickOf({ name: displayName(user), username: user.username })} отменил поединок.`,
+  );
 }
 
 async function applyFightReps(user, chatId, reps, score) {
@@ -535,45 +595,55 @@ async function applyFightReps(user, chatId, reps, score) {
       result = `${win.name} победил: ${win.reps} против ${lose.reps}.`;
     }
     const text = ["Поединок окончен.", formatFight(fight), "", result].join("\n");
-    await bot.sendMessage(chatId, text, { reply_markup: keyboard() });
-    const other = opponentOf(fight, user.id);
-    if (other) {
-      try { await bot.sendMessage(other.chatId, text, { reply_markup: keyboard() }); } catch { /* ignore */ }
-    }
+    await announceFight(fight, text);
     return true;
   }
 
   upsertFight(fight);
   const other = opponentOf(fight, user.id);
-  await bot.sendMessage(
-    chatId,
-    `Записал ${reps} ${pushupWord(reps)} в поединок. Ждём ${other?.name || "соперника"}.`,
-    { reply_markup: keyboard() },
+  await announceFight(
+    fight,
+    `${fight[side].name} сделал ${reps} ${pushupWord(reps)}. Ждём ${other?.name || "соперника"}.`,
   );
-  if (other) {
-    try {
-      await bot.sendMessage(
-        other.chatId,
-        `${fight[side].name} сделал ${reps} ${pushupWord(reps)}. Твой ход — открой AXIS.`,
-        { reply_markup: inline() },
-      );
-    } catch { /* ignore */ }
-  }
   return true;
 }
 
-async function resolveSharedOpponent(from, chatId, userId) {
+async function resolveSharedOpponent(from, chat, userId) {
   let name = "соперник";
   let username = "";
   try {
-    const chat = await bot.getChat(userId);
+    const info = await bot.getChat(userId);
     name = nickOf({
-      name: [chat.first_name, chat.last_name].filter(Boolean).join(" ") || chat.title || "соперник",
-      username: chat.username,
+      name: [info.first_name, info.last_name].filter(Boolean).join(" ") || info.title || "соперник",
+      username: info.username,
     });
-    username = chat.username || "";
+    username = info.username || "";
   } catch { /* only id known */ }
-  await startFight(from, chatId, { id: userId, name, username, chatId: userId });
+  await startFight(from, chat, { id: userId, name, username, chatId: userId });
+}
+
+function opponentFromMessage(msg, who) {
+  const reply = msg.reply_to_message?.from;
+  if (reply && !reply.is_bot && reply.id !== msg.from.id) {
+    return {
+      id: reply.id,
+      name: nickOf({ name: displayName(reply), username: reply.username }),
+      username: reply.username || "",
+      chatId: reply.id,
+    };
+  }
+  const ent = (msg.entities || []).find((e) => e.type === "text_mention");
+  if (ent?.user && !ent.user.is_bot && ent.user.id !== msg.from.id) {
+    const u = ent.user;
+    return {
+      id: u.id,
+      name: nickOf({ name: displayName(u), username: u.username }),
+      username: u.username || "",
+      chatId: u.id,
+    };
+  }
+  if (who) return { username: who.replace(/^@/, "") };
+  return null;
 }
 
 function parseWebAppPayload(raw) {
@@ -634,14 +704,29 @@ bot.setMyCommands([
   { command: "help", description: "Как пользоваться" },
 ]).catch((err) => console.error("commands", err.message));
 
+let botId = null;
 bot.getMe().then((me) => {
   if (me?.username) botUsername = me.username;
+  if (me?.id) botId = me.id;
 }).catch((err) => console.error("getMe", err.message));
+
+bot.setMyCommands(
+  [
+    { command: "fight", description: "Вызвать на поединок: /fight @ник" },
+    { command: "cancel", description: "Отменить поединок" },
+    { command: "help", description: "Как устроить поединок" },
+  ],
+  { scope: { type: "all_group_chats" } },
+).catch((err) => console.error("group commands", err.message));
 
 bot.onText(/^\/start(?:@\w+)?(?:\s+(\S+))?/, async (msg, match) => {
   const payload = match?.[1] || "";
   if (payload.startsWith("fight_")) {
     await acceptFight(msg.from, msg.chat.id, payload.slice(6));
+    return;
+  }
+  if (isGroupChat(msg.chat)) {
+    await bot.sendMessage(msg.chat.id, groupWelcome(), { reply_markup: markupFor(msg.chat) });
     return;
   }
   await greet(msg.chat.id, msg.from?.first_name || "друг");
@@ -654,18 +739,23 @@ bot.onText(/\/app\b|\/open\b/, async (msg) => {
 });
 
 bot.onText(/\/(leaders|лидеры|top|рейтинг)\b/i, async (msg) => {
-  await sendLeaderboard(msg.chat.id, msg.from);
+  await sendLeaderboard(msg.chat, msg.from);
 });
 
 bot.onText(/^\/fight(?:@\w+)?(?:\s+@?(\S+))?/i, async (msg, match) => {
   const who = match?.[1];
-  if (!who) {
-    await promptFight(msg.chat.id);
+  const direct = opponentFromMessage(msg, who);
+  if (!direct) {
+    await promptFight(msg.chat, msg.chat.id);
+    return;
+  }
+  if (direct.id) {
+    await startFight(msg.from, msg.chat, direct);
     return;
   }
   try {
-    const chat = await bot.getChat(who.startsWith("@") ? who : `@${who}`);
-    await startFight(msg.from, msg.chat.id, {
+    const chat = await bot.getChat(`@${direct.username}`);
+    await startFight(msg.from, msg.chat, {
       id: chat.id,
       name: nickOf({
         name: [chat.first_name, chat.last_name].filter(Boolean).join(" ") || chat.username || "соперник",
@@ -677,8 +767,10 @@ bot.onText(/^\/fight(?:@\w+)?(?:\s+@?(\S+))?/i, async (msg, match) => {
   } catch {
     await bot.sendMessage(
       msg.chat.id,
-      `Не нашёл ${who}. Нажми «Поединок» и выбери человека из списка.`,
-      { reply_markup: keyboard() },
+      isGroupChat(msg.chat)
+        ? `Не нашёл ${direct.username}. Ответь на сообщение соперника командой /fight.`
+        : `Не нашёл ${direct.username}. Нажми «Поединок» и выбери человека из списка.`,
+      { reply_markup: markupFor(msg.chat) },
     );
   }
 });
@@ -705,7 +797,10 @@ bot.onText(/\/help\b|\/помощь\b/, async (msg) => {
       "5. После отжиманий нажми «Отправить боту»",
       "",
       "Поединок 1 на 1:",
-      "Нажми «Поединок» и выбери друга. Оба делают один сет отжиманий — кто больше, тот победил.",
+      "В личке: кнопка «Поединок» или /fight @ник",
+      "В чате: добавь бота, затем /fight @ник или ответь /fight на сообщение",
+      "",
+      `Добавить в чат: ${addToGroupLink()}`,
       "",
       "Команды:",
       "/start — приветствие",
@@ -724,12 +819,12 @@ bot.on("callback_query", async (q) => {
     const data = q.data || "";
     if (data === "leaders") {
       await bot.answerCallbackQuery(q.id);
-      await sendLeaderboard(q.message.chat.id, q.from);
+      await sendLeaderboard(q.message.chat, q.from);
       return;
     }
     if (data === "fight") {
       await bot.answerCallbackQuery(q.id);
-      await promptFight(q.message.chat.id);
+      await promptFight(q.message.chat, q.message.chat.id);
       return;
     }
     if (data.startsWith("fight_ok:")) {
@@ -758,7 +853,7 @@ bot.on("message", async (msg) => {
   const sharedId = msg.user_shared?.user_id || msg.users_shared?.users?.[0]?.user_id || msg.users_shared?.user_ids?.[0];
   if (sharedId) {
     try {
-      await resolveSharedOpponent(msg.from, msg.chat.id, sharedId);
+      await resolveSharedOpponent(msg.from, msg.chat, sharedId);
     } catch (err) {
       console.error("user_shared", err.message);
     }
@@ -768,13 +863,14 @@ bot.on("message", async (msg) => {
   const text = msg.text.toLowerCase();
   const name = msg.from?.first_name || "друг";
   if (wantsLeaderboard(text)) {
-    await sendLeaderboard(msg.chat.id, msg.from);
+    await sendLeaderboard(msg.chat, msg.from);
     return;
   }
   if (wantsFight(text)) {
-    await promptFight(msg.chat.id);
+    await promptFight(msg.chat, msg.chat.id);
     return;
   }
+  if (isGroupChat(msg.chat)) return;
   if (/(привет|здравств|добр|хай|hello|hi)/i.test(text)) {
     await greet(msg.chat.id, name);
     return;
@@ -784,6 +880,29 @@ bot.on("message", async (msg) => {
     `${name}, я рядом. Нажми «Открыть AXIS», и начнём тренировку.`,
     { reply_markup: inline() },
   );
+});
+
+bot.on("my_chat_member", async (upd) => {
+  try {
+    const next = upd.new_chat_member;
+    const prev = upd.old_chat_member;
+    if (!isGroupChat(upd.chat) || !next) return;
+    if (!["member", "administrator"].includes(next.status)) return;
+    if (prev && ["member", "administrator"].includes(prev.status)) return;
+    await bot.sendMessage(upd.chat.id, groupWelcome(), { reply_markup: markupFor(upd.chat) });
+  } catch (err) {
+    console.error("my_chat_member", err.message);
+  }
+});
+
+bot.on("new_chat_members", async (msg) => {
+  try {
+    const added = (msg.new_chat_members || []).some((u) => u.is_bot && (u.username === botUsername || (botId && u.id === botId)));
+    if (!added || !isGroupChat(msg.chat)) return;
+    await bot.sendMessage(msg.chat.id, groupWelcome(), { reply_markup: markupFor(msg.chat) });
+  } catch (err) {
+    console.error("new_chat_members", err.message);
+  }
 });
 
 bot.on("polling_error", (err) => {
