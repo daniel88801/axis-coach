@@ -188,9 +188,24 @@ function recordPushups(user, reps) {
 }
 
 function ranked(board) {
-  return Object.values(board.users)
-    .filter((u) => u.total > 0)
-    .sort((a, b) => b.total - a.total || b.best - a.best || String(a.name).localeCompare(String(b.name), "ru"));
+  const byKey = new Map();
+  for (const u of Object.values(board.users || {})) {
+    if (!u || !(u.total > 0)) continue;
+    const nick = String(u.username || u.name || "").replace(/^@/, "").toLowerCase().trim();
+    const key = nick && nick !== "атлет" ? `n:${nick}` : `i:${u.id}`;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, { ...u });
+      continue;
+    }
+    prev.total = Math.max(prev.total, u.total);
+    prev.best = Math.max(prev.best, u.best);
+    prev.sets = Math.max(prev.sets || 0, u.sets || 0);
+    if (u.username) prev.username = u.username;
+  }
+  return [...byKey.values()].sort(
+    (a, b) => b.total - a.total || b.best - a.best || String(a.name).localeCompare(String(b.name), "ru"),
+  );
 }
 
 function pushupWord(n) {

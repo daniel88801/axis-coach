@@ -345,16 +345,59 @@ function emptyBoard() {
   return { v: 1, ts: 0, users: [] };
 }
 
+function nickKey(name) {
+  return String(name || "").replace(/^@/, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function isLocalRow(u) {
+  return String(u?.id) === "local" || u?.name === "Ты";
+}
+
+function isSamePerson(a, b, mine) {
+  if (!a || !b) return false;
+  if (String(a.id) === String(b.id)) return true;
+  if (isLocalRow(a) && String(b.id) === String(mine.id)) return true;
+  if (isLocalRow(b) && String(a.id) === String(mine.id)) return true;
+  if (isLocalRow(a) && isLocalRow(b)) return true;
+  const na = nickKey(a.name);
+  const nb = nickKey(b.name);
+  if (na && na === nb && na !== "ты" && na !== "атлет") return true;
+  return false;
+}
+
+function compactUsers(users) {
+  const mine = me();
+  const groups = [];
+  for (const u of users || []) {
+    if (!u || !(u.total > 0)) continue;
+    const found = groups.find((g) => isSamePerson(g, u, mine));
+    if (!found) {
+      groups.push({ ...u });
+      continue;
+    }
+    found.total = Math.max(Number(found.total) || 0, Number(u.total) || 0);
+    found.best = Math.max(Number(found.best) || 0, Number(u.best) || 0);
+    found.sets = Math.max(Number(found.sets) || 0, Number(u.sets) || 0);
+    if (!isLocalRow(u)) found.id = u.id;
+    if (String(u.name || "").startsWith("@")) found.name = u.name;
+    else if (!String(found.name || "").startsWith("@") && u.name && u.name !== "Ты") found.name = u.name;
+  }
+  return groups;
+}
+
 function loadLeaders() {
   try {
     const raw = JSON.parse(localStorage.getItem("axis.leaders") || "null");
-    if (raw && Array.isArray(raw.users)) return raw;
+    if (raw && Array.isArray(raw.users)) {
+      return { ...raw, users: compactUsers(raw.users) };
+    }
   } catch { /* ignore */ }
   return emptyBoard();
 }
 
 function saveLeaders(board) {
-  localStorage.setItem("axis.leaders", JSON.stringify(board));
+  const next = { ...board, users: compactUsers(board.users) };
+  localStorage.setItem("axis.leaders", JSON.stringify(next));
 }
 
 function normalizeBoard(raw) {
@@ -381,28 +424,10 @@ function ingestBoard(raw, { preferIncoming = false } = {}) {
   const incoming = normalizeBoard(raw);
   if (!incoming || !incoming.users.length) return loadLeaders();
   const local = loadLeaders();
-  const byId = new Map();
-  for (const u of local.users) byId.set(String(u.id), { ...u });
-  for (const u of incoming.users) {
-    const id = String(u.id);
-    const prev = byId.get(id);
-    if (!prev) {
-      byId.set(id, { ...u, id: u.id });
-      continue;
-    }
-    const takeIncoming = preferIncoming || incoming.ts >= (local.ts || 0);
-    byId.set(id, {
-      id: u.id,
-      name: u.name || prev.name,
-      total: takeIncoming ? Math.max(prev.total, u.total) : Math.max(u.total, prev.total),
-      best: Math.max(prev.best, u.best),
-      sets: Math.max(prev.sets, u.sets),
-    });
-  }
   const board = {
     v: 1,
     ts: Math.max(local.ts || 0, incoming.ts || 0, Date.now()),
-    users: [...byId.values()],
+    users: compactUsers([...(local.users || []), ...(incoming.users || [])]),
   };
   saveLeaders(board);
   return board;
@@ -412,15 +437,15 @@ function applyMyPushups(reps) {
   if (!Number.isFinite(reps) || reps < 1) return;
   const user = me();
   const board = loadLeaders();
-  const id = String(user.id);
-  const prev = board.users.find((u) => String(u.id) === id) || {
+  const prev = board.users.find((u) => isSamePerson(u, user, user)) || {
     id: user.id, name: user.name, total: 0, best: 0, sets: 0,
   };
+  prev.id = user.id;
   prev.name = user.name;
   prev.total += reps;
   prev.best = Math.max(prev.best, reps);
   prev.sets += 1;
-  board.users = board.users.filter((u) => String(u.id) !== id).concat(prev);
+  board.users = compactUsers(board.users.filter((u) => !isSamePerson(u, user, user)).concat(prev));
   board.ts = Date.now();
   saveLeaders(board);
 }
@@ -428,7 +453,7 @@ function applyMyPushups(reps) {
 function seedLeadersFromHistory() {
   const user = me();
   const board = loadLeaders();
-  if (board.users.some((u) => String(u.id) === String(user.id))) return;
+  if (board.users.some((u) => isSamePerson(u, user, user))) return;
   const sets = loadHistory().filter((s) => s.exercise === "push_up" && s.reps > 0);
   if (!sets.length) return;
   board.users.push({
@@ -483,7 +508,7 @@ async function fetchPublicBoards() {
 }
 
 function rankedUsers(board) {
-  return [...(board?.users || [])]
+  return compactUsers(board?.users || [])
     .filter((u) => u.total > 0)
     .sort((a, b) => b.total - a.total || b.best - a.best || String(a.name).localeCompare(String(b.name), "ru"));
 }
@@ -508,14 +533,15 @@ function renderLeaders() {
   const board = loadLeaders();
   const list = rankedUsers(board);
   const mine = me();
-  const myIdx = list.findIndex((u) => String(u.id) === String(mine.id));
+  const myIdx = list.findIndex((u) => isSamePerson(u, mine, mine));
   const meBox = document.getElementById("leadersMe");
   const box = document.getElementById("leadersList");
-  if (myIdx === -1) {
-    meBox.innerHTML = `<div class="tiny">ТЫ</div><b>Пока нет отжиманий</b><div class="muted">Закрой сет отжиманий — попадёшь в таблицу</div>`;
-  } else {
-    const row = list[myIdx];
-    meBox.innerHTML = `<div class="tiny">ТВОЁ МЕСТО</div><div class="lead-nick"><b>${esc(row.name)}</b>${badgeHtml(myIdx)}</div><div class="muted">#${myIdx + 1} · ${row.total} отжиманий</div>`;
+  if (meBox) {
+    if (myIdx === -1) {
+      meBox.innerHTML = `<div class="muted">Закрой сет отжиманий — попадёшь в таблицу</div>`;
+    } else {
+      meBox.innerHTML = `<div class="tiny">ТВОЁ МЕСТО</div><b>#${myIdx + 1} · ${list[myIdx].total} отж.</b>`;
+    }
   }
   renderHomeLeaders();
   if (!list.length) {
@@ -523,11 +549,11 @@ function renderLeaders() {
     return;
   }
   box.innerHTML = list.map((u, i) => {
-    const mineRow = String(u.id) === String(mine.id);
+    const mineRow = isSamePerson(u, mine, mine);
     return `
       <div class="card lead${mineRow ? " mine" : ""}">
         <div class="lead-nick">
-          <b>${esc(u.name)}${mineRow ? " · ты" : ""}</b>
+          <b>${esc(mineRow ? mine.name : u.name)}${mineRow ? " · ты" : ""}</b>
           ${badgeHtml(i)}
         </div>
         <div class="total">${u.total}</div>
