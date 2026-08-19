@@ -290,13 +290,22 @@ class Analyzer {
   }
 }
 
+function savedFacing() {
+  try {
+    const v = localStorage.getItem("axis.facing");
+    if (v === "user" || v === "environment") return v;
+  } catch { /* ignore */ }
+  return "user";
+}
+
 const state = {
   exercise: "squat",
   analyzer: null,
   started: 0,
   timer: null,
-  facing: "environment",
+  facing: savedFacing(),
   stream: null,
+  streamFacing: null,
   landmarker: null,
   running: false,
 };
@@ -585,9 +594,34 @@ async function openCameraStream() {
   throw lastErr || new Error("camera");
 }
 
+function cameraLive() {
+  const track = state.stream?.getVideoTracks?.()[0];
+  return !!(track && track.readyState === "live");
+}
+
+function releaseCamera() {
+  if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
+  state.stream = null;
+  state.streamFacing = null;
+  const video = document.getElementById("cam");
+  if (video) video.srcObject = null;
+}
+
 async function startCamera() {
+  const video = document.getElementById("cam");
+  video.setAttribute("playsinline", "true");
+  video.setAttribute("webkit-playsinline", "true");
+  video.muted = true;
+  video.playsInline = true;
+  if (cameraLive() && state.streamFacing === state.facing) {
+    if (video.srcObject !== state.stream) video.srcObject = state.stream;
+    await video.play();
+    return;
+  }
   if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
   state.stream = await openCameraStream();
+  state.streamFacing = state.facing;
+  try { localStorage.setItem("axis.facing", state.facing); } catch { /* ignore */ }
   const track = state.stream.getVideoTracks()[0];
   try {
     const caps = track.getCapabilities?.() || {};
@@ -595,11 +629,6 @@ async function startCamera() {
       await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
     }
   } catch { /* zoom not supported */ }
-  const video = document.getElementById("cam");
-  video.setAttribute("playsinline", "true");
-  video.setAttribute("webkit-playsinline", "true");
-  video.muted = true;
-  video.playsInline = true;
   video.srcObject = state.stream;
   await video.play();
 }
@@ -688,8 +717,6 @@ async function openSession(ex) {
 function stopSession() {
   state.running = false;
   clearInterval(state.timer);
-  if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
-  state.stream = null;
 }
 
 let pendingLeaders = null;
@@ -796,8 +823,11 @@ document.getElementById("again").onclick = () => { hideLeadersCta(); openSession
 document.getElementById("toHome").onclick = () => { hideLeadersCta(); show("home"); };
 document.getElementById("flipCam").onclick = async () => {
   state.facing = state.facing === "user" ? "environment" : "user";
+  try { localStorage.setItem("axis.facing", state.facing); } catch { /* ignore */ }
   if (state.running) await startCamera();
 };
+
+window.addEventListener("pagehide", releaseCamera);
 document.getElementById("dock").querySelectorAll("[data-tab]").forEach((btn) => {
   btn.addEventListener("click", () => {
     hideLeadersCta();
