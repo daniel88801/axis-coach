@@ -19,6 +19,16 @@ const CONN = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[2
 
 function show(id) {
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("on", v.id === id));
+  const dock = document.getElementById("dock");
+  const tabs = ["home", "leaders", "history"];
+  if (dock) {
+    dock.hidden = !tabs.includes(id);
+    dock.querySelectorAll("[data-tab]").forEach((b) => {
+      b.classList.toggle("on", b.dataset.tab === id);
+    });
+  }
+  if (id === "leaders") renderLeaders();
+  if (id === "history") renderHistory();
 }
 
 function angle(a, b, c) {
@@ -134,9 +144,220 @@ function loadHistory() {
 }
 function saveHistory(list) { localStorage.setItem("axis.sessions", JSON.stringify(list.slice(0, 40))); }
 
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function formatNick(username, fallback) {
+  const raw = String(username || "").replace(/^@/, "").trim();
+  if (raw) return `@${raw.slice(0, 32)}`;
+  return String(fallback || "Атлет").slice(0, 40);
+}
+
+function me() {
+  const u = tg?.initDataUnsafe?.user;
+  if (!u?.id) return { id: "local", name: "Ты" };
+  const fallback = [u.first_name, u.last_name].filter(Boolean).join(" ") || "Ты";
+  return { id: u.id, name: formatNick(u.username, fallback) };
+}
+
+function emptyBoard() {
+  return { v: 1, ts: 0, users: [] };
+}
+
+function loadLeaders() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("axis.leaders") || "null");
+    if (raw && Array.isArray(raw.users)) return raw;
+  } catch { /* ignore */ }
+  return emptyBoard();
+}
+
+function saveLeaders(board) {
+  localStorage.setItem("axis.leaders", JSON.stringify(board));
+}
+
+function normalizeBoard(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const rows = raw.users || raw.u;
+  if (!Array.isArray(rows)) return null;
+  const users = rows.map((row) => {
+    if (Array.isArray(row)) {
+      const [id, name, total, best, sets] = row;
+      return { id, name: formatNick("", name), total: Number(total) || 0, best: Number(best) || 0, sets: Number(sets) || 0 };
+    }
+    return {
+      id: row.id ?? row.i,
+      name: formatNick(row.username || row.nick, row.name || row.n || "Атлет"),
+      total: Number(row.total ?? row.t) || 0,
+      best: Number(row.best ?? row.b) || 0,
+      sets: Number(row.sets ?? row.s) || 0,
+    };
+  }).filter((u) => u.id != null && u.total > 0);
+  return { v: 1, ts: Number(raw.ts) || 0, users };
+}
+
+function ingestBoard(raw, { preferIncoming = false } = {}) {
+  const incoming = normalizeBoard(raw);
+  if (!incoming) return loadLeaders();
+  const local = loadLeaders();
+  const byId = new Map();
+  for (const u of local.users) byId.set(String(u.id), { ...u });
+  for (const u of incoming.users) {
+    const id = String(u.id);
+    const prev = byId.get(id);
+    if (!prev) {
+      byId.set(id, { ...u, id: u.id });
+      continue;
+    }
+    const takeIncoming = preferIncoming || incoming.ts >= (local.ts || 0);
+    byId.set(id, {
+      id: u.id,
+      name: u.name || prev.name,
+      total: takeIncoming ? Math.max(prev.total, u.total) : Math.max(u.total, prev.total),
+      best: Math.max(prev.best, u.best),
+      sets: Math.max(prev.sets, u.sets),
+    });
+  }
+  const board = {
+    v: 1,
+    ts: Math.max(local.ts || 0, incoming.ts || 0, Date.now()),
+    users: [...byId.values()],
+  };
+  saveLeaders(board);
+  return board;
+}
+
+function applyMyPushups(reps) {
+  if (!Number.isFinite(reps) || reps < 1) return;
+  const user = me();
+  const board = loadLeaders();
+  const id = String(user.id);
+  const prev = board.users.find((u) => String(u.id) === id) || {
+    id: user.id, name: user.name, total: 0, best: 0, sets: 0,
+  };
+  prev.name = user.name;
+  prev.total += reps;
+  prev.best = Math.max(prev.best, reps);
+  prev.sets += 1;
+  board.users = board.users.filter((u) => String(u.id) !== id).concat(prev);
+  board.ts = Date.now();
+  saveLeaders(board);
+}
+
+function seedLeadersFromHistory() {
+  const user = me();
+  const board = loadLeaders();
+  if (board.users.some((u) => String(u.id) === String(user.id))) return;
+  const sets = loadHistory().filter((s) => s.exercise === "push_up" && s.reps > 0);
+  if (!sets.length) return;
+  board.users.push({
+    id: user.id,
+    name: user.name,
+    total: sets.reduce((sum, s) => sum + s.reps, 0),
+    best: Math.max(...sets.map((s) => s.reps)),
+    sets: sets.length,
+  });
+  board.ts = Date.now();
+  saveLeaders(board);
+}
+
+function boardFromUrl() {
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const query = new URLSearchParams(location.search);
+  const raw = query.get("lb") || hash.get("lb");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    try {
+      const pad = raw.replace(/-/g, "+").replace(/_/g, "/");
+      const b64 = pad + "=".repeat((4 - (pad.length % 4)) % 4);
+      return JSON.parse(atob(b64));
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function fetchPublicBoard() {
+  const url = new URL("leaders.json", document.baseURI);
+  url.searchParams.set("t", String(Date.now()));
+  const res = await fetch(url.href, { cache: "no-store" });
+  if (!res.ok) throw new Error("leaders.json");
+  return res.json();
+}
+
+function rankedUsers(board) {
+  return [...(board?.users || [])]
+    .filter((u) => u.total > 0)
+    .sort((a, b) => b.total - a.total || b.best - a.best || String(a.name).localeCompare(String(b.name), "ru"));
+}
+
+function badgeHtml(i) {
+  if (i === 0) return `<span class="badge gold" title="1 место">1</span>`;
+  if (i === 1) return `<span class="badge silver" title="2 место">2</span>`;
+  if (i === 2) return `<span class="badge bronze" title="3 место">3</span>`;
+  return "";
+}
+
+function renderHomeLeaders() {
+  const preview = document.getElementById("homeLeadersPreview");
+  if (!preview) return;
+  const top = rankedUsers(loadLeaders())[0];
+  preview.textContent = top
+    ? `${top.name} — ${top.total} отж.`
+    : "Кто сделал больше — с ником и счётом";
+}
+
+function renderLeaders() {
+  const board = loadLeaders();
+  const list = rankedUsers(board);
+  const mine = me();
+  const myIdx = list.findIndex((u) => String(u.id) === String(mine.id));
+  const meBox = document.getElementById("leadersMe");
+  const box = document.getElementById("leadersList");
+  if (myIdx === -1) {
+    meBox.innerHTML = `<div class="tiny">ТЫ</div><b>Пока нет отжиманий</b><div class="muted">Закрой сет отжиманий — попадёшь в таблицу</div>`;
+  } else {
+    const row = list[myIdx];
+    meBox.innerHTML = `<div class="tiny">ТВОЁ МЕСТО</div><div class="lead-nick"><b>${esc(row.name)}</b>${badgeHtml(myIdx)}</div><div class="muted">#${myIdx + 1} · ${row.total} отжиманий</div>`;
+  }
+  renderHomeLeaders();
+  if (!list.length) {
+    box.innerHTML = `<div class="muted" style="padding:12px 0">Таблица пуста. Сделай первый сет отжиманий.</div>`;
+    return;
+  }
+  box.innerHTML = list.map((u, i) => {
+    const mineRow = String(u.id) === String(mine.id);
+    return `
+      <div class="card lead${mineRow ? " mine" : ""}">
+        <div class="lead-nick">
+          <b>${esc(u.name)}${mineRow ? " · ты" : ""}</b>
+          ${badgeHtml(i)}
+        </div>
+        <div class="total">${u.total}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function refreshLeaders() {
+  const fromUrl = boardFromUrl();
+  if (fromUrl) ingestBoard(fromUrl, { preferIncoming: true });
+  seedLeadersFromHistory();
+  try {
+    ingestBoard(await fetchPublicBoard());
+  } catch { /* static snapshot optional */ }
+  renderLeaders();
+}
+
 function refreshHome() {
   const n = loadHistory().length;
   document.getElementById("pill").textContent = n ? `${n} СЕТОВ` : "ПЕРВЫЙ СЕТ";
+  renderHomeLeaders();
 }
 
 function renderHistory() {
@@ -235,6 +456,7 @@ function tickClock() {
 }
 
 async function openSession(ex) {
+  hideLeadersCta();
   state.exercise = ex;
   state.analyzer = new Analyzer(ex);
   state.started = Date.now();
@@ -261,6 +483,67 @@ function stopSession() {
   clearInterval(state.timer);
   if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
   state.stream = null;
+}
+
+let pendingLeaders = null;
+
+function hideLeadersCta() {
+  pendingLeaders = null;
+  const btn = document.getElementById("toLeaders");
+  if (btn) {
+    btn.hidden = true;
+    btn.disabled = false;
+    btn.textContent = "К таблице лидеров";
+    btn.onclick = null;
+  }
+  if (tg?.MainButton) {
+    try { tg.MainButton.offClick(onLeadersSubmit); } catch { /* optional */ }
+    try { tg.MainButton.hide(); } catch { /* optional */ }
+  }
+}
+
+function submitPushupsToBot(rec) {
+  if (!tg?.sendData || rec.exercise !== "push_up" || rec.reps < 1) return false;
+  try {
+    tg.HapticFeedback?.notificationOccurred?.("success");
+    tg.sendData(JSON.stringify({
+      exercise: "push_up",
+      reps: rec.reps,
+      score: rec.score,
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function onLeadersSubmit() {
+  const rec = pendingLeaders;
+  const btn = document.getElementById("toLeaders");
+  if (!rec) return;
+  if (submitPushupsToBot(rec)) {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Отправлено боту";
+    }
+  }
+}
+
+function showLeadersCta(rec) {
+  hideLeadersCta();
+  if (rec.exercise !== "push_up" || rec.reps < 1) return;
+  pendingLeaders = rec;
+  const btn = document.getElementById("toLeaders");
+  if (btn) {
+    btn.hidden = false;
+    btn.textContent = "К таблице лидеров";
+    btn.onclick = () => show("leaders");
+  }
+  if (tg?.MainButton) {
+    tg.MainButton.setText(`Отправить боту · ${rec.reps}`);
+    tg.MainButton.show();
+    tg.MainButton.onClick(onLeadersSubmit);
+  }
 }
 
 function endSet() {
@@ -290,22 +573,31 @@ function endSet() {
   document.getElementById("recapTime").textContent = `${m}:${String(s).padStart(2, "0")}`;
   document.getElementById("recapCue").textContent = rec.cue;
   refreshHome();
+  if (rec.exercise === "push_up" && rec.reps > 0) applyMyPushups(rec.reps);
+  showLeadersCta(rec);
   show("recap");
 }
 
 document.querySelectorAll("[data-ex]").forEach((el) => {
   el.addEventListener("click", () => openSession(el.dataset.ex));
 });
-document.getElementById("toHistory").onclick = () => { renderHistory(); show("history"); };
-document.getElementById("backHome").onclick = () => show("home");
-document.getElementById("closeSession").onclick = () => { stopSession(); show("home"); };
+document.getElementById("toHistory").onclick = () => show("history");
+document.getElementById("homeLeaders").onclick = () => show("leaders");
+document.getElementById("closeSession").onclick = () => { hideLeadersCta(); stopSession(); show("home"); };
 document.getElementById("endSet").onclick = endSet;
-document.getElementById("again").onclick = () => openSession(state.exercise);
-document.getElementById("toHome").onclick = () => show("home");
+document.getElementById("again").onclick = () => { hideLeadersCta(); openSession(state.exercise); };
+document.getElementById("toHome").onclick = () => { hideLeadersCta(); show("home"); };
 document.getElementById("flipCam").onclick = async () => {
   state.facing = state.facing === "user" ? "environment" : "user";
   if (state.running) await startCamera();
 };
+document.getElementById("dock").querySelectorAll("[data-tab]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    hideLeadersCta();
+    show(btn.dataset.tab);
+  });
+});
 
 refreshHome();
+refreshLeaders();
 setTimeout(() => show("home"), 1800);

@@ -15,4 +15,6 @@
 .kotlin
 art/walkthrough/
 bot/.env
+bot/data/
 bot/node_modules/
+_axis_tg_repo/

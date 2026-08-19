@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="favicon.png" />
   <meta property="og:title" content="AXIS" />
   <meta property="og:image" content="https://daniel88801.github.io/axis-coach/app_icon.png" />
-  <link rel="stylesheet" href="app.css" />
+  <link rel="stylesheet" href="app.css?v=3" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -32,8 +32,16 @@
       </div>
       <h1 class="hero">AXIS</h1>
       <div class="coach">ТРЕНЕР</div>
-      <p class="muted" style="margin:10px 0 20px">Поза на устройстве. Живые подсказки. Внутри Telegram.</p>
-      <div class="tiny">ВЫБЕРИ УПРАЖНЕНИЕ</div>
+      <p class="muted" style="margin:10px 0 16px">Поза на устройстве. Живые подсказки. Внутри Telegram.</p>
+      <div class="card tap leaders-entry" id="homeLeaders" role="button">
+        <div style="flex:1;min-width:0">
+          <div class="idx" style="color:var(--amber)">ЛИДЕРЫ</div>
+          <b>Таблица отжиманий</b>
+          <div class="muted" id="homeLeadersPreview">Ник и счёт лучших</div>
+        </div>
+        <div class="go gold-go">★</div>
+      </div>
+      <div class="tiny" style="margin-top:16px">ВЫБЕРИ УПРАЖНЕНИЕ</div>
       <div class="cards">
         <div class="card tap" data-ex="squat">
           <div style="flex:1"><div class="idx" style="color:var(--lime)">01</div><b>Присед</b><div class="muted">Глубина, колени, корпус</div></div>
@@ -48,7 +56,9 @@
           <div class="go" style="background:var(--amber)">→</div>
         </div>
       </div>
-      <div class="link" id="toHistory">История →</div>
+      <div class="home-links">
+        <button class="link" id="toHistory" type="button">История →</button>
+      </div>
     </section>
 
     <section class="view" id="session">
@@ -91,18 +101,39 @@
       <div class="card" style="margin-top:10px;display:block">
         <div class="tiny">ЧАСТАЯ ПОДСКАЗКА</div><b id="recapCue">—</b>
       </div>
+      <button class="btn mint" id="toLeaders" hidden>К таблице лидеров</button>
       <button class="btn" id="again">Ещё раз</button>
       <button class="btn ghost" id="toHome">На главную</button>
     </section>
 
+    <section class="view" id="leaders">
+      <div class="row space">
+        <h3>Лидеры</h3>
+        <div class="pill">ОТЖИМАНИЯ</div>
+      </div>
+      <p class="muted" style="margin:8px 0 14px">Кто сделал больше отжиманий</p>
+      <div class="card me-card" id="leadersMe"></div>
+      <div class="board-head">
+        <span>НИК</span>
+        <span>ОТЖИМАНИЯ</span>
+      </div>
+      <div class="hist" id="leadersList"></div>
+    </section>
+
     <section class="view" id="history">
-      <div class="row" style="gap:10px">
-        <button class="icon-btn" id="backHome">←</button>
+      <div class="row space">
         <h3>История</h3>
+        <div class="pill">СЕТЫ</div>
       </div>
       <div class="hist" id="histList"></div>
     </section>
+
+    <nav class="dock" id="dock" hidden>
+      <button type="button" data-tab="home">Тренировка</button>
+      <button type="button" data-tab="leaders">Лидеры</button>
+      <button type="button" data-tab="history">История</button>
+    </nav>
   </div>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=3"></script>
 </body>
 </html>
