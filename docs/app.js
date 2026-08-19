@@ -552,10 +552,31 @@ async function initPose() {
 
 async function startCamera() {
   if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
-  state.stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: state.facing, width: { ideal: 720 }, height: { ideal: 1280 } },
-    audio: false,
-  });
+  const facing = state.facing === "user" ? "user" : "environment";
+  try {
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: facing },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        resizeMode: "none",
+      },
+      audio: false,
+    });
+  } catch {
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facing } },
+      audio: false,
+    });
+  }
+  const track = state.stream.getVideoTracks()[0];
+  try {
+    const caps = track.getCapabilities?.() || {};
+    if (caps.zoom) {
+      const minZoom = typeof caps.zoom.min === "number" ? caps.zoom.min : 1;
+      await track.applyConstraints({ advanced: [{ zoom: minZoom }] });
+    }
+  } catch { /* zoom not supported */ }
   const video = document.getElementById("cam");
   const overlay = document.getElementById("overlay");
   video.style.transform = "none";

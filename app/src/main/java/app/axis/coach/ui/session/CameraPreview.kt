@@ -29,7 +29,7 @@ fun CameraPreview(
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember {
         PreviewView(context).apply {
-            scaleType = PreviewView.ScaleType.FILL_CENTER
+            scaleType = PreviewView.ScaleType.FIT_CENTER
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
     }
@@ -66,7 +66,8 @@ fun CameraPreview(
         } else {
             CameraSelector.DEFAULT_BACK_CAMERA
         }
-        cameraProvider.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
+        val camera = cameraProvider.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
+        camera.cameraControl.setLinearZoom(0f)
     }
 
     DisposableEffect(Unit) {
