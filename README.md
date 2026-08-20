@@ -45,6 +45,8 @@ Bot: [@AXIStg01_bot](https://t.me/AXIStg01_bot)
 
 The same coach runs as a Telegram Mini App (camera + MediaPipe Pose in the browser).
 
+Репозиторий бота: https://github.com/daniel88801/axis-telegram-bot
+
 ```
 cd bot
 cp .env.example .env   # put TELEGRAM_BOT_TOKEN
